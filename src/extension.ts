@@ -31,8 +31,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const notificationMgr = new NotificationManager(terminalMgr);
 
   // Register commands
+  const extPath = context.extensionPath;
   context.subscriptions.push(
-    vscode.commands.registerCommand("heydev.setup", runSetup),
+    vscode.commands.registerCommand("heydev.setup", () => runSetup(extPath)),
     vscode.commands.registerCommand("heydev.removeHooks", runUninstall)
   );
 
@@ -48,7 +49,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       "Later"
     );
     if (action === "Run Setup") {
-      await runSetup();
+      await runSetup(extPath);
     }
   }
 
