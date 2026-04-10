@@ -55,14 +55,35 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   }
 
-  // Prompt setup on first install if hook script doesn't exist
-  const stateFiles = fs.existsSync(stateDir)
-    ? fs.readdirSync(stateDir).filter((f) => f.endsWith(".json") && f !== "emoji-config.json")
-    : [];
+  // Check if setup is complete — prompt if any piece is missing
   const hookScript = path.join(os.homedir(), ".claude", "scripts", "heydev-hook.sh");
-  if (!fs.existsSync(hookScript) && stateFiles.length === 0) {
+  const claudeSettingsPath = path.join(os.homedir(), ".claude", "settings.json");
+  const termTitle = vscode.workspace.getConfiguration("terminal.integrated.tabs").get<string>("title", "${process}");
+
+  let setupNeeded = false;
+  if (!fs.existsSync(hookScript)) {
+    setupNeeded = true;
+  } else if (!termTitle.includes("${sequence}")) {
+    setupNeeded = true;
+  } else if (fs.existsSync(claudeSettingsPath)) {
+    try {
+      const settings = JSON.parse(fs.readFileSync(claudeSettingsPath, "utf-8"));
+      const hasHooks = Object.values(settings.hooks ?? {}).some((entries: unknown) =>
+        (entries as Array<{ hooks?: Array<{ command?: string }> }>).some((e) =>
+          e.hooks?.some((h) => h.command?.includes("heydev-hook.sh"))
+        )
+      );
+      if (!hasHooks) setupNeeded = true;
+    } catch {
+      setupNeeded = true;
+    }
+  } else {
+    setupNeeded = true;
+  }
+
+  if (setupNeeded) {
     const action = await vscode.window.showInformationMessage(
-      "Welcome to HeyDev! Run setup to configure Claude Code integration.",
+      "HeyDev needs setup to work. Configure Claude Code integration now?",
       "Run Setup",
       "Later"
     );
