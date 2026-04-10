@@ -5,6 +5,7 @@ import * as os from "os";
 import { SessionWatcher } from "./sessionWatcher.js";
 import { TerminalManager } from "./terminalManager.js";
 import { NotificationManager } from "./notificationManager.js";
+import { runSetup, runUninstall } from "./setup.js";
 import type { SessionState } from "./types.js";
 
 function syncEmojiConfig(stateDir: string): void {
@@ -20,7 +21,7 @@ function syncEmojiConfig(stateDir: string): void {
   );
 }
 
-export function activate(context: vscode.ExtensionContext): void {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const config = vscode.workspace.getConfiguration("heydev");
   const customDir = config.get<string>("stateDirectory", "");
   const stateDir = customDir || path.join(os.homedir(), ".claude", "terminal-status");
@@ -28,6 +29,28 @@ export function activate(context: vscode.ExtensionContext): void {
   const watcher = new SessionWatcher(stateDir);
   const terminalMgr = new TerminalManager();
   const notificationMgr = new NotificationManager(terminalMgr);
+
+  // Register commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand("heydev.setup", runSetup),
+    vscode.commands.registerCommand("heydev.removeHooks", runUninstall)
+  );
+
+  // Prompt setup on first install if state directory doesn't exist or is empty
+  const stateFiles = fs.existsSync(stateDir)
+    ? fs.readdirSync(stateDir).filter((f) => f.endsWith(".json"))
+    : [];
+  const hookScript = path.join(os.homedir(), ".claude", "scripts", "heydev-hook.sh");
+  if (!fs.existsSync(hookScript) && stateFiles.length === 0) {
+    const action = await vscode.window.showInformationMessage(
+      "Welcome to HeyDev! Run setup to configure Claude Code integration.",
+      "Run Setup",
+      "Later"
+    );
+    if (action === "Run Setup") {
+      await runSetup();
+    }
+  }
 
   // Sync emoji config on activation and when settings change
   syncEmojiConfig(stateDir);

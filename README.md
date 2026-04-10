@@ -58,126 +58,33 @@ The VS Code status bar shows the state of the currently focused AI terminal sess
 
 ## Installation
 
-### From VSIX (Local)
+### Quick Setup (Recommended)
+
+1. Install **HeyDev** from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=salilmonga.heydev)
+2. Install **jq** if you don't have it: `brew install jq` (macOS) or [download](https://jqlang.github.io/jq/download/)
+3. Open VS Code → `Cmd+Shift+P` → **"HeyDev: Setup Claude Code Integration"**
+4. Restart your Claude Code sessions
+
+That's it. The setup command automatically:
+- Creates the hook script
+- Configures Claude Code hooks (preserving your existing hooks)
+- Disables Claude's built-in title management
+- Creates the state directory
+
+### Removing
+
+To cleanly remove HeyDev hooks: `Cmd+Shift+P` → **"HeyDev: Remove Hooks from Claude Code"**
+
+### Building from Source
 
 ```bash
-cd claude-terminal-status
+git clone https://github.com/SalilMonga/HeyDev.git
+cd HeyDev
 npm install
 npm run compile
 npx @vscode/vsce package --allow-missing-repository
 code --install-extension heydev-0.1.0.vsix
 ```
-
-### Prerequisites
-
-1. **Claude Code CLI** installed and configured
-2. **jq** installed (`brew install jq` on macOS)
-3. **Hook script** and **hooks** configured (see Setup below)
-
-## Setup
-
-### 1. Install the hook script
-
-Copy the hook helper script:
-
-```bash
-mkdir -p ~/.claude/scripts
-cat > ~/.claude/scripts/claude-hook-state.sh << 'EOF'
-#!/bin/bash
-STATE="$1"
-INPUT=$(cat)
-SID=$(echo "$INPUT" | jq -r '.session_id')
-TAG=$(echo "$SID" | cut -c1-4)
-SHELL_PID=$(ps -o ppid= -p $PPID 2>/dev/null | tr -d ' ')
-
-CONFIG_FILE="$HOME/.claude/terminal-status/emoji-config.json"
-if [ -f "$CONFIG_FILE" ]; then
-  WORKING_EMOJI=$(jq -r '.workingEmoji // "⚡"' "$CONFIG_FILE")
-  WAITING_EMOJI=$(jq -r '.waitingEmoji // "👀"' "$CONFIG_FILE")
-else
-  WORKING_EMOJI="⚡"
-  WAITING_EMOJI="👀"
-fi
-
-STATE_DIR="$HOME/.claude/terminal-status"
-mkdir -p "$STATE_DIR"
-echo "{\"session_id\":\"$SID\",\"tag\":\"$TAG\",\"state\":\"$STATE\",\"timestamp\":$(date +%s),\"shell_pid\":${SHELL_PID:-0}}" > "$STATE_DIR/$SID.json"
-
-if [ "$STATE" = "working" ]; then
-  printf "\033]0;$WORKING_EMOJI Claude [$TAG] - Working\007" > /dev/tty
-else
-  printf "\033]0;$WAITING_EMOJI Claude [$TAG] - Waiting\007" > /dev/tty
-fi
-EOF
-chmod +x ~/.claude/scripts/claude-hook-state.sh
-```
-
-### 2. Add hooks to Claude Code settings
-
-Add these hooks to your `~/.claude/settings.json`:
-
-```json
-{
-  "env": {
-    "CLAUDE_CODE_DISABLE_TERMINAL_TITLE": "1"
-  },
-  "hooks": {
-    "Notification": [
-      {
-        "matcher": "idle_prompt|permission_prompt|elicitation_dialog",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/scripts/claude-hook-state.sh waiting",
-            "async": true
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/scripts/claude-hook-state.sh working",
-            "async": true
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/scripts/claude-hook-state.sh working",
-            "async": true
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/scripts/claude-hook-state.sh working",
-            "async": true
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-### 3. Disable Claude's built-in title management
-
-The `CLAUDE_CODE_DISABLE_TERMINAL_TITLE` environment variable (included in the config above) prevents Claude Code from overwriting the custom terminal titles.
-
-### 4. Reload VS Code
-
-Press `Cmd+Shift+P` → "Reload Window" to activate the extension.
 
 ## Settings
 

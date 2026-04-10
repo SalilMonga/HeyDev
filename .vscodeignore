@@ -1,8 +1,10 @@
 .vscode/**
 node_modules/**
 src/**
+documents/**
 tsconfig.json
 TEST_PLAN.md
+CONTRIBUTING.md
 images/*.html
 **/*.map
 **/*.ts

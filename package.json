@@ -35,6 +35,16 @@
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "heydev.setup",
+        "title": "HeyDev: Setup Claude Code Integration"
+      },
+      {
+        "command": "heydev.removeHooks",
+        "title": "HeyDev: Remove Hooks from Claude Code"
+      }
+    ],
     "configuration": {
       "title": "HeyDev",
       "properties": {
