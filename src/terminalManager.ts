@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import type { SessionState, TrackedTerminal } from "./types.js";
 
+export type TerminalClosedCallback = (sessionId: string) => void;
+
 export class TerminalManager {
   // Map shell PID -> VS Code terminal
   private pidToTerminal = new Map<number, vscode.Terminal>();
@@ -8,6 +10,7 @@ export class TerminalManager {
   private sessionToTerminal = new Map<string, TrackedTerminal>();
   private disposables: vscode.Disposable[] = [];
   private statusBarItem: vscode.StatusBarItem;
+  private onTerminalClosedCallbacks: TerminalClosedCallback[] = [];
 
   constructor() {
     this.statusBarItem = vscode.window.createStatusBarItem(
@@ -61,10 +64,13 @@ export class TerminalManager {
       }
     }
 
-    // Remove from session map
+    // Remove from session map and notify listeners
     for (const [sessionId, tracked] of this.sessionToTerminal) {
       if (tracked.terminal === terminal) {
         this.sessionToTerminal.delete(sessionId);
+        for (const cb of this.onTerminalClosedCallbacks) {
+          cb(sessionId);
+        }
         break;
       }
     }
@@ -102,6 +108,10 @@ export class TerminalManager {
 
   getAllSessions(): Map<string, TrackedTerminal> {
     return this.sessionToTerminal;
+  }
+
+  onTerminalClosed(callback: TerminalClosedCallback): void {
+    this.onTerminalClosedCallbacks.push(callback);
   }
 
   private updateStatusBar(terminal: vscode.Terminal | undefined): void {

@@ -2,6 +2,16 @@
 
 All notable changes to HeyDev will be documented in this file.
 
+## [0.2.1] - 2026-04-10
+
+### Fixed
+- Hook script escaping — bundled as a file instead of JS string literal
+- Terminal titles now work correctly on fresh installs
+- Notifications cancelled when terminal is closed (no more stale notifications)
+
+### Changed
+- Setup command reads hook script from extension bundle (zero escaping issues)
+
 ## [0.2.0] - 2026-04-10
 
 ### Added

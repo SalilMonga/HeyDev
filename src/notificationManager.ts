@@ -17,6 +17,13 @@ export class NotificationManager {
   }
 
   start(): void {
+    // Cancel everything when a terminal is closed
+    this.terminalManager.onTerminalClosed((sessionId) => {
+      this.cancelPending(sessionId);
+      this.activeNotifications.delete(sessionId);
+      this.alreadyNotified.delete(sessionId);
+    });
+
     // Cancel pending notifications when user manually switches to a Claude terminal
     this.disposables.push(
       vscode.window.onDidChangeActiveTerminal((terminal) => {
