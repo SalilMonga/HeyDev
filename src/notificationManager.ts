@@ -8,6 +8,8 @@ export class NotificationManager {
   private pendingTimers = new Map<string, NodeJS.Timeout>();
   // Track which sessions have a visible notification so we can ignore stale clicks
   private activeNotifications = new Set<string>();
+  // Track sessions that have already been notified — don't re-notify until state cycles back through "working"
+  private alreadyNotified = new Set<string>();
   private disposables: vscode.Disposable[] = [];
 
   constructor(terminalManager: TerminalManager) {
@@ -23,8 +25,9 @@ export class NotificationManager {
         for (const [sessionId, tracked] of this.terminalManager.getAllSessions()) {
           if (tracked.terminal === terminal) {
             this.cancelPending(sessionId);
-            // Mark notification as stale so clicks are ignored
+            // Mark notification as stale so clicks are ignored, and prevent re-notify
             this.activeNotifications.delete(sessionId);
+            this.alreadyNotified.add(sessionId);
             break;
           }
         }
@@ -37,9 +40,10 @@ export class NotificationManager {
     if (state.state === "waiting") {
       this.scheduleNotification(state);
     } else {
-      // State changed to "working" — cancel any pending notification
+      // State changed to "working" — cancel any pending notification and reset notified flag
       this.cancelPending(state.session_id);
       this.activeNotifications.delete(state.session_id);
+      this.alreadyNotified.delete(state.session_id);
     }
   }
 
@@ -47,8 +51,11 @@ export class NotificationManager {
     const config = vscode.workspace.getConfiguration("heydev");
     if (!config.get<boolean>("showNotifications", true)) return;
 
-    // Cancel any existing timer for this session (reset the clock)
-    this.cancelPending(state.session_id);
+    // Don't re-notify if we already sent one for this waiting period
+    if (this.alreadyNotified.has(state.session_id)) return;
+
+    // Don't schedule if there's already a pending timer
+    if (this.pendingTimers.has(state.session_id)) return;
 
     const delaySeconds = config.get<number>("notificationDelaySeconds", 60);
     const delayMs = delaySeconds * 1000;
@@ -80,8 +87,9 @@ export class NotificationManager {
       ? `[${state.tag}] needs your attention${snippet}`
       : `[${state.tag}] waiting${snippet}`;
 
-    // Mark this notification as active
+    // Mark this notification as active and already notified
     this.activeNotifications.add(state.session_id);
+    this.alreadyNotified.add(state.session_id);
 
     const action = await vscode.window.showInformationMessage(
       message,
@@ -122,6 +130,7 @@ export class NotificationManager {
     }
     this.pendingTimers.clear();
     this.activeNotifications.clear();
+    this.alreadyNotified.clear();
     for (const d of this.disposables) {
       d.dispose();
     }
