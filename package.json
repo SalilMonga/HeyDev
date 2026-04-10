@@ -2,7 +2,7 @@
   "name": "heydev",
   "displayName": "HeyDev",
   "description": "Real-time status indicators for AI CLI sessions (Claude Code, Codex, Copilot) in VS Code terminal tabs, with smart notifications and quick reply",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "salilmonga",
   "license": "MIT",
   "repository": {
