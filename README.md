@@ -18,6 +18,8 @@ Claude Terminal Status adds live status indicators to your terminal tabs and sen
 
 Each Claude terminal tab shows its current state with a unique session tag:
 
+![Terminal tabs showing Working and Waiting states](images/screenshot-tabs.png)
+
 - **⚡ Claude [a1b2] - Working** — Claude is actively using tools
 - **👀 Claude [a1b2] - Waiting** — Claude is waiting for your input
 
@@ -25,16 +27,25 @@ The 4-character tag (`a1b2`) uniquely identifies each session, so you can tell m
 
 ### Smart Notifications
 
-When Claude has been waiting for your input, a VS Code notification appears with two actions:
+When Claude has been waiting for your input, a VS Code notification appears with context about what Claude is asking:
+
+![Notification with Focus Terminal and Quick Reply buttons](images/screenshot-notification.png)
 
 - **Focus Terminal** — Instantly switches to the correct terminal
 - **Quick Reply** — Opens an input box to send a response (e.g., "yes", "no", "continue") without switching terminals
 
 Notifications are smart:
+- Show a snippet of Claude's last message so you know what it's asking
 - Only fire after a configurable delay (default: 60 seconds)
 - Cancelled if Claude starts working again before the delay
 - Cancelled if you manually switch to the terminal
 - Suppressed if the terminal is already focused
+
+### Configurable Settings
+
+Customize emojis, notification timing, and more:
+
+![Extension settings](images/screenshot-settings.png)
 
 ### Status Bar
 

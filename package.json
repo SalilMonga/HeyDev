@@ -7,12 +7,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/salilmonga/claude-terminal-status"
+    "url": "https://github.com/SalilMonga/claude-terminal-status"
   },
   "bugs": {
-    "url": "https://github.com/salilmonga/claude-terminal-status/issues"
+    "url": "https://github.com/SalilMonga/claude-terminal-status/issues"
   },
-  "homepage": "https://github.com/salilmonga/claude-terminal-status#readme",
+  "homepage": "https://github.com/SalilMonga/claude-terminal-status#readme",
   "keywords": [
     "claude",
     "claude-code",
@@ -26,6 +26,7 @@
   "engines": {
     "vscode": "^1.85.0"
   },
+  "icon": "images/icon.png",
   "categories": ["Other"],
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",

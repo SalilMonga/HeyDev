@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 128px;
+    height: 128px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    border-radius: 24px;
+    overflow: hidden;
+  }
+  .container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .terminal {
+    width: 80px;
+    height: 56px;
+    background: #0d1117;
+    border-radius: 8px;
+    border: 2px solid #30363d;
+    padding: 6px 8px;
+    position: relative;
+    overflow: hidden;
+  }
+  .terminal-header {
+    display: flex;
+    gap: 3px;
+    margin-bottom: 5px;
+  }
+  .dot { width: 5px; height: 5px; border-radius: 50%; }
+  .dot-red { background: #ff5f57; }
+  .dot-yellow { background: #febc2e; }
+  .dot-green { background: #28c840; }
+  .terminal-line {
+    height: 3px;
+    border-radius: 2px;
+    margin-bottom: 3px;
+  }
+  .line-1 { width: 70%; background: #58a6ff; }
+  .line-2 { width: 50%; background: #7ee787; }
+  .line-3 { width: 60%; background: #d2a8ff; }
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ffa657;
+    box-shadow: 0 0 8px rgba(255, 166, 87, 0.6);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(0.85); }
+  }
+  .status-text {
+    font-family: -apple-system, sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    color: #e6edf3;
+    letter-spacing: 0.5px;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="terminal">
+      <div class="terminal-header">
+        <div class="dot dot-red"></div>
+        <div class="dot dot-yellow"></div>
+        <div class="dot dot-green"></div>
+      </div>
+      <div class="terminal-line line-1"></div>
+      <div class="terminal-line line-2"></div>
+      <div class="terminal-line line-3"></div>
+    </div>
+    <div class="status-row">
+      <div class="status-dot"></div>
+      <span class="status-text">CLAUDE</span>
+    </div>
+  </div>
+</body>
+</html>
