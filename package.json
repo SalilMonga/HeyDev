@@ -1,0 +1,76 @@
+{
+  "name": "claude-terminal-status",
+  "displayName": "Claude Terminal Status",
+  "description": "Real-time status indicators for Claude Code CLI sessions in VS Code terminal tabs, with smart notifications and quick reply",
+  "version": "0.1.0",
+  "publisher": "salilmonga",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/salilmonga/claude-terminal-status"
+  },
+  "bugs": {
+    "url": "https://github.com/salilmonga/claude-terminal-status/issues"
+  },
+  "homepage": "https://github.com/salilmonga/claude-terminal-status#readme",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "terminal",
+    "status",
+    "notifications",
+    "ai",
+    "anthropic",
+    "cli"
+  ],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Claude Terminal Status",
+      "properties": {
+        "claudeTerminalStatus.showNotifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show VS Code notifications when Claude has been waiting for your input"
+        },
+        "claudeTerminalStatus.notificationDelaySeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 0,
+          "description": "Seconds to wait before showing a notification (0 = immediate). Notification is cancelled if Claude starts working again."
+        },
+        "claudeTerminalStatus.workingEmoji": {
+          "type": "string",
+          "default": "⚡",
+          "description": "Emoji shown in terminal tab when Claude is working"
+        },
+        "claudeTerminalStatus.waitingEmoji": {
+          "type": "string",
+          "default": "👀",
+          "description": "Emoji shown in terminal tab when Claude is waiting for input"
+        },
+        "claudeTerminalStatus.stateDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "Override state file directory (default: ~/.claude/terminal-status)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
+    "typescript": "^5.5.0"
+  }
+}
