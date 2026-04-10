@@ -204,7 +204,36 @@ export async function runSetup(extensionPath: string): Promise<void> {
   const stateDir = path.join(os.homedir(), ".claude", "terminal-status");
   fs.mkdirSync(stateDir, { recursive: true });
 
-  // Step 6: Show results
+  // Step 6: Configure VS Code terminal title setting
+  const termConfig = vscode.workspace.getConfiguration("terminal.integrated.tabs");
+  const currentTitle = termConfig.get<string>("title", "${process}");
+
+  if (!currentTitle.includes("${sequence}")) {
+    const scope = await vscode.window.showInformationMessage(
+      "HeyDev needs to set terminal.integrated.tabs.title to \"${sequence}\" so terminal tab names update. Where should this be applied?",
+      { detail: "User (global) applies to all projects. Workspace applies only to this project.", modal: true },
+      "User (Recommended)",
+      "Workspace Only",
+      "Skip"
+    );
+
+    if (scope === "User (Recommended)") {
+      await termConfig.update("title", "${sequence}", vscode.ConfigurationTarget.Global);
+      // Also set description to show process name as subtitle
+      await termConfig.update("description", "${task}${separator}${local}", vscode.ConfigurationTarget.Global);
+      added.push("VS Code terminal title setting (User)");
+    } else if (scope === "Workspace Only") {
+      await termConfig.update("title", "${sequence}", vscode.ConfigurationTarget.Workspace);
+      await termConfig.update("description", "${task}${separator}${local}", vscode.ConfigurationTarget.Workspace);
+      added.push("VS Code terminal title setting (Workspace)");
+    } else {
+      skipped.push("VS Code terminal title setting (skipped)");
+    }
+  } else {
+    skipped.push("VS Code terminal title (already configured)");
+  }
+
+  // Step 7: Show results
   const lines: string[] = [];
 
   if (added.length > 0) {
@@ -285,6 +314,23 @@ export async function runUninstall(): Promise<void> {
       "heydev-hook.sh"
     );
     if (fs.existsSync(scriptPath)) fs.unlinkSync(scriptPath);
+
+    // Offer to revert VS Code terminal title setting
+    const termConfig = vscode.workspace.getConfiguration("terminal.integrated.tabs");
+    const currentTitle = termConfig.get<string>("title", "");
+    if (currentTitle === "${sequence}") {
+      const revert = await vscode.window.showInformationMessage(
+        "Revert terminal tab title setting to default?",
+        "Yes",
+        "No"
+      );
+      if (revert === "Yes") {
+        await termConfig.update("title", undefined, vscode.ConfigurationTarget.Global);
+        await termConfig.update("title", undefined, vscode.ConfigurationTarget.Workspace);
+        await termConfig.update("description", undefined, vscode.ConfigurationTarget.Global);
+        await termConfig.update("description", undefined, vscode.ConfigurationTarget.Workspace);
+      }
+    }
 
     vscode.window.showInformationMessage(
       "HeyDev hooks removed. Restart Claude Code sessions to take effect."
