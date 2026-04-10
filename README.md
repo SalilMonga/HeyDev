@@ -71,9 +71,15 @@ That's it. The setup command automatically:
 - Disables Claude's built-in title management
 - Creates the state directory
 
-### Removing
+### Uninstalling
 
-To cleanly remove HeyDev hooks: `Cmd+Shift+P` → **"HeyDev: Remove Hooks from Claude Code"**
+**Important:** Run this before uninstalling the extension from VS Code.
+
+1. `Cmd+Shift+P` → **"HeyDev: Remove Hooks from Claude Code"**
+2. This removes all hooks, env vars, scripts, and offers to revert VS Code settings
+3. Then uninstall the extension from the Extensions panel
+
+> VS Code doesn't support auto-cleanup on extension uninstall, so step 1 is required to remove the Claude Code hooks cleanly.
 
 ### Building from Source
 

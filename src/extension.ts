@@ -37,9 +37,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("heydev.removeHooks", runUninstall)
   );
 
-  // Prompt setup on first install if state directory doesn't exist or is empty
+  // Clean up stale state files on startup (older than 5 minutes)
+  // Prevents notifications for sessions that ended before VS Code restarted
+  if (fs.existsSync(stateDir)) {
+    const now = Date.now();
+    for (const file of fs.readdirSync(stateDir).filter((f) => f.endsWith(".json") && f !== "emoji-config.json")) {
+      try {
+        const filePath = path.join(stateDir, file);
+        const content = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+        const ageMs = now - (content.timestamp * 1000);
+        if (ageMs > 5 * 60 * 1000) {
+          fs.unlinkSync(filePath);
+        }
+      } catch {
+        // Skip unparseable files
+      }
+    }
+  }
+
+  // Prompt setup on first install if hook script doesn't exist
   const stateFiles = fs.existsSync(stateDir)
-    ? fs.readdirSync(stateDir).filter((f) => f.endsWith(".json"))
+    ? fs.readdirSync(stateDir).filter((f) => f.endsWith(".json") && f !== "emoji-config.json")
     : [];
   const hookScript = path.join(os.homedir(), ".claude", "scripts", "heydev-hook.sh");
   if (!fs.existsSync(hookScript) && stateFiles.length === 0) {
