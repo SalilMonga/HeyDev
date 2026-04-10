@@ -44,7 +44,7 @@ export class NotificationManager {
   }
 
   private scheduleNotification(state: SessionState): void {
-    const config = vscode.workspace.getConfiguration("claudeTerminalStatus");
+    const config = vscode.workspace.getConfiguration("heydev");
     if (!config.get<boolean>("showNotifications", true)) return;
 
     // Cancel any existing timer for this session (reset the clock)
@@ -77,8 +77,8 @@ export class NotificationManager {
       : "";
 
     const message = delaySeconds === 0
-      ? `Claude [${state.tag}] needs your attention${snippet}`
-      : `Claude [${state.tag}] waiting${snippet}`;
+      ? `[${state.tag}] needs your attention${snippet}`
+      : `[${state.tag}] waiting${snippet}`;
 
     // Mark this notification as active
     this.activeNotifications.add(state.session_id);
@@ -99,7 +99,7 @@ export class NotificationManager {
       terminal.show();
     } else if (action === "Quick Reply") {
       const reply = await vscode.window.showInputBox({
-        prompt: `Reply to Claude [${state.tag}]`,
+        prompt: `Reply to [${state.tag}]`,
         placeHolder: "Type your response (e.g. yes, no, continue...)",
       });
       if (reply !== undefined && reply !== "") {

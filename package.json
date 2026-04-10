@@ -1,7 +1,7 @@
 {
-  "name": "claude-terminal-status",
-  "displayName": "Claude Terminal Status",
-  "description": "Real-time status indicators for Claude Code CLI sessions in VS Code terminal tabs, with smart notifications and quick reply",
+  "name": "heydev",
+  "displayName": "HeyDev",
+  "description": "Real-time status indicators for AI CLI sessions (Claude Code, Codex, Copilot) in VS Code terminal tabs, with smart notifications and quick reply",
   "version": "0.1.0",
   "publisher": "salilmonga",
   "license": "MIT",
@@ -14,8 +14,12 @@
   },
   "homepage": "https://github.com/SalilMonga/claude-terminal-status#readme",
   "keywords": [
+    "heydev",
     "claude",
     "claude-code",
+    "codex",
+    "copilot",
+    "aider",
     "terminal",
     "status",
     "notifications",
@@ -32,30 +36,30 @@
   "main": "./out/extension.js",
   "contributes": {
     "configuration": {
-      "title": "Claude Terminal Status",
+      "title": "HeyDev",
       "properties": {
-        "claudeTerminalStatus.showNotifications": {
+        "heydev.showNotifications": {
           "type": "boolean",
           "default": true,
-          "description": "Show VS Code notifications when Claude has been waiting for your input"
+          "description": "Show VS Code notifications when your AI agent (e.g. Claude Code) has been waiting for your input"
         },
-        "claudeTerminalStatus.notificationDelaySeconds": {
+        "heydev.notificationDelaySeconds": {
           "type": "number",
           "default": 60,
           "minimum": 0,
-          "description": "Seconds to wait before showing a notification (0 = immediate). Notification is cancelled if Claude starts working again."
+          "description": "Seconds to wait before showing a notification (0 = immediate). Notification is cancelled if the AI agent starts working again."
         },
-        "claudeTerminalStatus.workingEmoji": {
+        "heydev.workingEmoji": {
           "type": "string",
           "default": "⚡",
-          "description": "Emoji shown in terminal tab when Claude is working"
+          "description": "Emoji shown in terminal tab when the AI CLI is working"
         },
-        "claudeTerminalStatus.waitingEmoji": {
+        "heydev.waitingEmoji": {
           "type": "string",
           "default": "👀",
-          "description": "Emoji shown in terminal tab when Claude is waiting for input"
+          "description": "Emoji shown in terminal tab when the AI CLI is waiting for input"
         },
-        "claudeTerminalStatus.stateDirectory": {
+        "heydev.stateDirectory": {
           "type": "string",
           "default": "",
           "description": "Override state file directory (default: ~/.claude/terminal-status)"

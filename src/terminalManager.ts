@@ -115,8 +115,8 @@ export class TerminalManager {
       if (tracked.terminal === terminal) {
         const icon = tracked.currentState === "working" ? "$(zap)" : "$(eye)";
         const stateText = tracked.currentState === "working" ? "Working" : "Waiting";
-        this.statusBarItem.text = `${icon} Claude [${tracked.tag}] ${stateText}`;
-        this.statusBarItem.tooltip = `Claude session ${tracked.tag} is ${stateText.toLowerCase()}`;
+        this.statusBarItem.text = `${icon} [${tracked.tag}] ${stateText}`;
+        this.statusBarItem.tooltip = `Session ${tracked.tag} is ${stateText.toLowerCase()}`;
         this.statusBarItem.show();
         return;
       }

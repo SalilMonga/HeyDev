@@ -8,7 +8,7 @@ import { NotificationManager } from "./notificationManager.js";
 import type { SessionState } from "./types.js";
 
 function syncEmojiConfig(stateDir: string): void {
-  const config = vscode.workspace.getConfiguration("claudeTerminalStatus");
+  const config = vscode.workspace.getConfiguration("heydev");
   const emojiConfig = {
     workingEmoji: config.get<string>("workingEmoji", "⚡"),
     waitingEmoji: config.get<string>("waitingEmoji", "👀"),
@@ -21,7 +21,7 @@ function syncEmojiConfig(stateDir: string): void {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
-  const config = vscode.workspace.getConfiguration("claudeTerminalStatus");
+  const config = vscode.workspace.getConfiguration("heydev");
   const customDir = config.get<string>("stateDirectory", "");
   const stateDir = customDir || path.join(os.homedir(), ".claude", "terminal-status");
 
@@ -33,7 +33,7 @@ export function activate(context: vscode.ExtensionContext): void {
   syncEmojiConfig(stateDir);
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("claudeTerminalStatus")) {
+      if (e.affectsConfiguration("heydev")) {
         syncEmojiConfig(stateDir);
       }
     })
@@ -60,7 +60,7 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   });
 
-  console.log("Claude Terminal Status extension activated");
+  console.log("HeyDev extension activated");
 }
 
 export function deactivate(): void {

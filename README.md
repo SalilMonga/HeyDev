@@ -1,33 +1,33 @@
-# Claude Terminal Status
+# HeyDev
 
-> Know when Claude needs you — without watching the terminal.
+> Hey dev, your AI is waiting for you.
 
-A VS Code extension that shows real-time status indicators for Claude Code CLI sessions in your terminal tabs, with smart notifications that bring you back when Claude is waiting for input.
+A VS Code extension that shows real-time status indicators for AI CLI sessions (like Claude Code) in your terminal tabs, with smart notifications that bring you back when the AI is waiting for input.
 
 ## The Problem
 
-When running multiple Claude Code sessions in VS Code, you constantly switch between terminals to check if Claude is done working or waiting for your input. There's no visual indicator in the terminal tab, and no way to know which session needs attention.
+When running multiple AI CLI sessions in VS Code, you constantly switch between terminals to check if the agent is done working or waiting for your input. There's no visual indicator in the terminal tab, and no way to know which session needs attention.
 
 ## The Solution
 
-Claude Terminal Status adds live status indicators to your terminal tabs and sends smart VS Code notifications when Claude has been waiting for you.
+HeyDev adds live status indicators to your terminal tabs and sends smart VS Code notifications when your AI agent has been waiting for you.
 
 ## Features
 
 ### Terminal Tab Status
 
-Each Claude terminal tab shows its current state with a unique session tag:
+Each AI terminal tab shows its current state with a unique session tag:
 
 ![Terminal tabs showing Working and Waiting states](images/screenshot-tabs.png)
 
-- **⚡ Claude [a1b2] - Working** — Claude is actively using tools
-- **👀 Claude [a1b2] - Waiting** — Claude is waiting for your input
+- **⚡ Claude [a1b2] - Working** — The AI agent is actively using tools
+- **👀 Claude [a1b2] - Waiting** — The AI agent is waiting for your input
 
-The 4-character tag (`a1b2`) uniquely identifies each session, so you can tell multiple Claude terminals apart at a glance.
+The 4-character tag (`a1b2`) uniquely identifies each session, so you can tell multiple terminals apart at a glance.
 
 ### Smart Notifications
 
-When Claude has been waiting for your input, a VS Code notification appears with context about what Claude is asking:
+When the AI agent has been waiting for your input, a VS Code notification appears with context about what it's asking:
 
 ![Notification with Focus Terminal and Quick Reply buttons](images/screenshot-notification.png)
 
@@ -35,9 +35,9 @@ When Claude has been waiting for your input, a VS Code notification appears with
 - **Quick Reply** — Opens an input box to send a response (e.g., "yes", "no", "continue") without switching terminals
 
 Notifications are smart:
-- Show a snippet of Claude's last message so you know what it's asking
+- Show a snippet of the AI's last message so you know what it's asking
 - Only fire after a configurable delay (default: 60 seconds)
-- Cancelled if Claude starts working again before the delay
+- Cancelled if the AI starts working again before the delay
 - Cancelled if you manually switch to the terminal
 - Suppressed if the terminal is already focused
 
@@ -49,7 +49,12 @@ Customize emojis, notification timing, and more:
 
 ### Status Bar
 
-The VS Code status bar shows the state of the currently focused Claude terminal session.
+The VS Code status bar shows the state of the currently focused AI terminal session.
+
+## Supported Tools
+
+- **Claude Code** — Fully supported today via hooks
+- **Codex, Copilot, Aider** — Planned for future releases
 
 ## Installation
 
@@ -60,7 +65,7 @@ cd claude-terminal-status
 npm install
 npm run compile
 npx @vscode/vsce package --allow-missing-repository
-code --install-extension claude-terminal-status-0.1.0.vsix
+code --install-extension heydev-0.1.0.vsix
 ```
 
 ### Prerequisites
@@ -145,7 +150,7 @@ Add these hooks to your `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/scripts/claude-hook-state.sh waiting",
+            "command": "~/.claude/scripts/claude-hook-state.sh working",
             "async": true
           }
         ]
@@ -176,37 +181,37 @@ Press `Cmd+Shift+P` → "Reload Window" to activate the extension.
 
 ## Settings
 
-Configure via VS Code Settings (`Cmd+,`) → search "Claude Terminal Status":
+Configure via VS Code Settings (`Cmd+,`) → search "HeyDev":
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `claudeTerminalStatus.showNotifications` | `true` | Enable/disable VS Code notifications |
-| `claudeTerminalStatus.notificationDelaySeconds` | `60` | Seconds to wait before notifying (0 = immediate) |
-| `claudeTerminalStatus.workingEmoji` | `⚡` | Emoji for the "working" state in terminal tabs |
-| `claudeTerminalStatus.waitingEmoji` | `👀` | Emoji for the "waiting" state in terminal tabs |
-| `claudeTerminalStatus.stateDirectory` | *(auto)* | Override state file directory |
+| `heydev.showNotifications` | `true` | Enable/disable VS Code notifications |
+| `heydev.notificationDelaySeconds` | `60` | Seconds to wait before notifying (0 = immediate) |
+| `heydev.workingEmoji` | `⚡` | Emoji for the "working" state in terminal tabs |
+| `heydev.waitingEmoji` | `👀` | Emoji for the "waiting" state in terminal tabs |
+| `heydev.stateDirectory` | *(auto)* | Override state file directory |
 
 Emoji changes sync automatically to the hook script — no manual editing needed.
 
 ## How It Works
 
 ```
-Claude Code CLI
+AI CLI (e.g. Claude Code)
   ↓ (hooks fire on state changes)
 Hook Script (~/.claude/scripts/claude-hook-state.sh)
   ↓ writes state file          ↓ sets terminal title
   ~/.claude/terminal-status/    Terminal tab: ⚡ Claude [a1b2] - Working
   ↓ (fs.watch)
-VS Code Extension
+VS Code Extension (HeyDev)
   ↓ maps session → terminal via PID
   ↓ sends notifications
-  VS Code notification: "Claude [a1b2] has been waiting for 1 minute"
+  VS Code notification: "[a1b2] has been waiting for 1 minute"
     → [Focus Terminal] [Quick Reply]
 ```
 
-1. **Hooks** fire on Claude Code events (tool use, stop, user prompt)
+1. **Hooks** fire on AI CLI events (tool use, stop, user prompt)
 2. **Hook script** writes a JSON state file and sets the terminal title
-3. **Extension** watches the state directory for changes
+3. **HeyDev extension** watches the state directory for changes
 4. **PID matching** maps each state file to the correct VS Code terminal
 5. **Notifications** appear after the configured delay with actions to focus or quick-reply
 
