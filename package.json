@@ -7,12 +7,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/SalilMonga/claude-terminal-status"
+    "url": "https://github.com/SalilMonga/HeyDev"
   },
   "bugs": {
-    "url": "https://github.com/SalilMonga/claude-terminal-status/issues"
+    "url": "https://github.com/SalilMonga/HeyDev/issues"
   },
-  "homepage": "https://github.com/SalilMonga/claude-terminal-status#readme",
+  "homepage": "https://github.com/SalilMonga/HeyDev#readme",
   "keywords": [
     "heydev",
     "claude",
