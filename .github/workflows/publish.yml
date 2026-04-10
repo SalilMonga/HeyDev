@@ -22,6 +22,11 @@ jobs:
 
       - run: npm run compile
 
+      - name: Sync version from git tag
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          npm version $VERSION --no-git-tag-version
+
       - name: Package VSIX
         run: npx @vscode/vsce package --allow-missing-repository
 
