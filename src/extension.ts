@@ -6,6 +6,7 @@ import { SessionWatcher } from "./sessionWatcher.js";
 import { TerminalManager } from "./terminalManager.js";
 import { NotificationManager } from "./notificationManager.js";
 import { runSetup, runUninstall } from "./setup.js";
+import { isProcessAlive } from "./types.js";
 import type { SessionState } from "./types.js";
 
 function syncEmojiConfig(stateDir: string): void {
@@ -46,7 +47,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const filePath = path.join(stateDir, file);
         const content = JSON.parse(fs.readFileSync(filePath, "utf-8"));
         const ageMs = now - (content.timestamp * 1000);
-        if (ageMs > 5 * 60 * 1000) {
+        if (ageMs > 5 * 60 * 1000 || !isProcessAlive(content.shell_pid)) {
           fs.unlinkSync(filePath);
         }
       } catch {
@@ -102,16 +103,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     })
   );
 
+  // Suppress notifications during initial state read — only update terminal mappings
+  let notificationsReady = false;
+
   watcher.on("stateChange", (state: SessionState) => {
     terminalMgr.updateSession(state);
-    notificationMgr.handleStateChange(state);
+    if (notificationsReady) {
+      notificationMgr.handleStateChange(state);
+    }
   });
 
   // Clean up stale files from previous sessions
   watcher.cleanupStaleFiles();
 
-  // Start watching
+  // Start watching (readExistingStates fires synchronously — notifications suppressed)
   watcher.start();
+  notificationsReady = true;
   terminalMgr.start();
   notificationMgr.start();
 

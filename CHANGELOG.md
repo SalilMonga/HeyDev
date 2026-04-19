@@ -2,6 +2,17 @@
 
 All notable changes to HeyDev will be documented in this file.
 
+## [0.2.3] - 2026-04-19
+
+### Fixed
+- **Cross-instance notification spillover** — notifications now only fire for sessions owned by the current VS Code window, not all instances watching the shared state directory
+- **Startup notification flood** — opening a terminal after a while no longer triggers dozens of stale notifications; existing state files are consumed silently on startup
+- **Ghost session cleanup** — state files from dead processes (closed terminals, crashed sessions) are now detected via PID liveness checks and cleaned up automatically
+
+### Added
+- `isProcessAlive()` utility — uses `process.kill(pid, 0)` signal check to verify session processes are still running
+- PID liveness checks at three points: startup cleanup, file read, and notification scheduling
+
 ## [0.2.1] - 2026-04-10
 
 ### Fixed

@@ -40,6 +40,9 @@ Notifications are smart:
 - Cancelled if the AI starts working again before the delay
 - Cancelled if you manually switch to the terminal
 - Suppressed if the terminal is already focused
+- **Instance-aware** — only fire in the VS Code window that owns the terminal (no cross-window spillover)
+- **Startup-safe** — existing state files are consumed silently on launch (no notification flood)
+- **Ghost-proof** — dead session files are auto-cleaned via PID liveness checks
 
 ### Configurable Settings
 
@@ -89,7 +92,7 @@ cd HeyDev
 npm install
 npm run compile
 npx @vscode/vsce package --allow-missing-repository
-code --install-extension heydev-0.1.0.vsix
+code --install-extension heydev-0.2.3.vsix
 ```
 
 ## Settings
@@ -111,7 +114,7 @@ Emoji changes sync automatically to the hook script — no manual editing needed
 ```
 AI CLI (e.g. Claude Code)
   ↓ (hooks fire on state changes)
-Hook Script (~/.claude/scripts/claude-hook-state.sh)
+Hook Script (~/.claude/scripts/heydev-hook.sh)
   ↓ writes state file          ↓ sets terminal title
   ~/.claude/terminal-status/    Terminal tab: ⚡ Claude [a1b2] - Working
   ↓ (fs.watch)
@@ -126,7 +129,9 @@ VS Code Extension (HeyDev)
 2. **Hook script** writes a JSON state file and sets the terminal title
 3. **HeyDev extension** watches the state directory for changes
 4. **PID matching** maps each state file to the correct VS Code terminal
-5. **Notifications** appear after the configured delay with actions to focus or quick-reply
+5. **PID liveness** verifies the session process is still alive — dead session files are cleaned up automatically
+6. **Ownership check** ensures notifications only fire in the VS Code instance that owns the terminal
+7. **Notifications** appear after the configured delay with actions to focus or quick-reply
 
 ## Compatibility
 

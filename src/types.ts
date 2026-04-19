@@ -14,3 +14,14 @@ export interface TrackedTerminal {
   currentState: "working" | "waiting" | "unknown";
   tag: string | undefined;
 }
+
+/** Check if a process is still alive (signal 0 = existence check). */
+export function isProcessAlive(pid: number): boolean {
+  if (!pid || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}

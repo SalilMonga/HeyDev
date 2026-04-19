@@ -58,6 +58,9 @@ export class NotificationManager {
     const config = vscode.workspace.getConfiguration("heydev");
     if (!config.get<boolean>("showNotifications", true)) return;
 
+    // Only notify for sessions that belong to a terminal in THIS VS Code instance
+    if (!this.terminalManager.getTerminalForSession(state.session_id)) return;
+
     // Don't re-notify if we already sent one for this waiting period
     if (this.alreadyNotified.has(state.session_id)) return;
 

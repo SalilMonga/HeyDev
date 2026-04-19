@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { EventEmitter } from "events";
+import { isProcessAlive } from "./types.js";
 import type { SessionState } from "./types.js";
 
 export class SessionWatcher extends EventEmitter {
@@ -55,9 +56,9 @@ export class SessionWatcher extends EventEmitter {
       const content = fs.readFileSync(filePath, "utf-8");
       const state: SessionState = JSON.parse(content);
 
-      // Skip stale files (older than 24 hours)
+      // Skip stale files (older than 24 hours) or files from dead processes
       const ageMs = Date.now() - state.timestamp * 1000;
-      if (ageMs > 24 * 60 * 60 * 1000) {
+      if (ageMs > 24 * 60 * 60 * 1000 || !isProcessAlive(state.shell_pid)) {
         this.cleanupFile(filePath);
         return;
       }
