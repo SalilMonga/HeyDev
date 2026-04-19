@@ -2,7 +2,7 @@
 
 All notable changes to HeyDev will be documented in this file.
 
-## [0.2.3] - 2026-04-19
+## [0.3.3] - 2026-04-19
 
 ### Fixed
 - **Cross-instance notification spillover** — notifications now only fire for sessions owned by the current VS Code window, not all instances watching the shared state directory

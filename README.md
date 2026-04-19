@@ -92,7 +92,7 @@ cd HeyDev
 npm install
 npm run compile
 npx @vscode/vsce package --allow-missing-repository
-code --install-extension heydev-0.2.3.vsix
+code --install-extension heydev-0.3.3.vsix
 ```
 
 ## Settings
