@@ -8,7 +8,17 @@ All notable changes to HeyDev will be documented in this file.
 - **OpenAI Codex CLI support** — HeyDev now works with both Claude Code and Codex CLI out of the box
 - Tool-agnostic hook script — terminal tabs show tool name (e.g., "Codex [a1b2] - Working")
 - Auto-detection — setup command detects installed tools and configures hooks for each
-- Codex hooks cleanup on uninstall
+- Codex `terminal_title` auto-disabled in config.toml (prevents TUI from overwriting tab titles)
+- `CODEX_HOME` env var support for custom Codex config locations
+- Robust PID walk-up — finds terminal shell PID across any process depth (Claude, Codex, future tools)
+
+### Changed
+- **All HeyDev files moved to `~/.heydev/`** — tool-neutral location instead of `~/.claude/`
+- Auto-migration of state files from old `~/.claude/terminal-status/` path
+- Setup notification redesigned — clean one-line message with "View Details" (Output Channel) and "Open Settings" buttons
+- "Already configured" message now a clean single line
+- Command palette renamed: "Setup AI CLI Integration (Claude, Codex)" and "Remove All Hooks (Claude, Codex)"
+- Uninstall cleans both old (`~/.claude/scripts/`) and new (`~/.heydev/`) hook locations
 
 ## [0.3.3] - 2026-04-19
 

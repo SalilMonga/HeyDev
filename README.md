@@ -80,11 +80,11 @@ That's it. The setup command automatically:
 
 **Important:** Run this before uninstalling the extension from VS Code.
 
-1. `Cmd+Shift+P` → **"HeyDev: Remove Hooks from Claude Code"**
-2. This removes all hooks, env vars, scripts, and offers to revert VS Code settings
+1. `Cmd+Shift+P` → **"HeyDev: Remove All Hooks (Claude, Codex)"**
+2. This removes all hooks from Claude and Codex, cleans up env vars, scripts, and offers to revert VS Code settings
 3. Then uninstall the extension from the Extensions panel
 
-> VS Code doesn't support auto-cleanup on extension uninstall, so step 1 is required to remove the Claude Code hooks cleanly.
+> VS Code doesn't support auto-cleanup on extension uninstall, so step 1 is required to remove hooks cleanly.
 
 ### Building from Source
 
