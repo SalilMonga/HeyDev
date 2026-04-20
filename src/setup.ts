@@ -450,40 +450,69 @@ export async function runSetup(extensionPath: string): Promise<void> {
   }
 
   // Step 7: Show results
-  const lines: string[] = [];
+  const hasCodex = checkCommand("codex");
 
-  if (added.length > 0) {
-    lines.push(`Configured: ${added.join(", ")}`);
+  if (added.length === 0) {
+    const hasCodexInstalled = checkCommand("codex");
+    const configuredTools = ["Claude"];
+    if (hasCodexInstalled) configuredTools.push("Codex");
+
+    vscode.window.showInformationMessage(
+      `HeyDev is already configured for ${configuredTools.join(" & ")}.`,
+      "OK"
+    );
+    return;
+  }
+
+  // Build tool list for short message
+  const tools = ["Claude"];
+  if (hasCodex) tools.push("Codex");
+
+  // Log details to output channel for those who want them
+  const output = vscode.window.createOutputChannel("HeyDev Setup");
+  output.appendLine("=== HeyDev Setup Complete ===\n");
+  output.appendLine("Configured:");
+  for (const item of added) {
+    output.appendLine(`  + ${item}`);
   }
   if (skipped.length > 0) {
-    lines.push(`Already set: ${skipped.join(", ")}`);
+    output.appendLine("\nAlready set:");
+    for (const item of skipped) {
+      output.appendLine(`  - ${item}`);
+    }
   }
-  lines.push(`Hook script: ${scriptPath}`);
+  output.appendLine(`\nHook script: ${scriptPath}`);
+  output.appendLine(`State directory: ${path.join(os.homedir(), ".heydev", "state")}`);
+  output.appendLine("\nRestart your AI CLI sessions to activate.");
 
-  const message =
-    added.length > 0
-      ? `HeyDev setup complete! Restart your AI CLI sessions to activate.\n\n${lines.join("\n")}`
-      : `HeyDev is already configured. ${lines.join(". ")}`;
-
-  const hasCodex = checkCommand("codex");
-  const buttons: string[] = [];
-  if (added.length > 0) {
-    buttons.push("Open Claude Settings");
-    if (hasCodex) buttons.push("Open Codex Settings");
-  } else {
-    buttons.push("OK");
+  output.appendLine("\nConfig files:");
+  output.appendLine(`  Claude: ${path.join(os.homedir(), ".claude", "settings.json")}`);
+  if (hasCodex) {
+    output.appendLine(`  Codex:  ${path.join(getCodexHome(), "hooks.json")}`);
   }
 
-  const action = await vscode.window.showInformationMessage(message, ...buttons);
+  const action = await vscode.window.showInformationMessage(
+    `HeyDev configured for ${tools.join(" & ")}. Restart your AI sessions to activate.`,
+    "View Details",
+    "Open Settings"
+  );
 
-  if (action === "Open Claude Settings") {
-    const settingsPath = path.join(os.homedir(), ".claude", "settings.json");
-    const doc = await vscode.workspace.openTextDocument(settingsPath);
-    await vscode.window.showTextDocument(doc);
-  } else if (action === "Open Codex Settings") {
-    const codexPath = path.join(getCodexHome(), "hooks.json");
-    const doc = await vscode.workspace.openTextDocument(codexPath);
-    await vscode.window.showTextDocument(doc);
+  if (action === "View Details") {
+    output.show();
+  } else if (action === "Open Settings") {
+    // Open both config files in tabs
+    const claudePath = path.join(os.homedir(), ".claude", "settings.json");
+    if (fs.existsSync(claudePath)) {
+      const doc = await vscode.workspace.openTextDocument(claudePath);
+      await vscode.window.showTextDocument(doc, { preview: false });
+    }
+    if (hasCodex) {
+      const codexPath = path.join(getCodexHome(), "hooks.json");
+      if (fs.existsSync(codexPath)) {
+        const doc = await vscode.workspace.openTextDocument(codexPath);
+        await vscode.window.showTextDocument(doc, { preview: false });
+      }
+    }
   }
 }
 
