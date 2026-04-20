@@ -15,14 +15,34 @@ if [ -z "$SID" ]; then
 fi
 TAG=$(echo "$SID" | cut -c1-4)
 
-# Get the shell PID (terminal shell -> cli tool -> hook shell)
-SHELL_PID=$(ps -o ppid= -p $PPID 2>/dev/null | tr -d ' ')
+# Find terminal shell PID by walking up process tree
+# Walk all the way up, pick the LAST shell encountered before init/IDE process
+# Claude: hook → claude → zsh
+# Codex:  hook → codex → node → zsh
+CURRENT_PID=$$
+SHELL_PID=0
+for i in 1 2 3 4 5 6 7 8; do
+  PARENT=$(ps -o ppid= -p $CURRENT_PID 2>/dev/null | tr -d ' ')
+  [ -z "$PARENT" ] || [ "$PARENT" = "1" ] && break
+  PNAME=$(ps -o comm= -p $PARENT 2>/dev/null)
+  PNAME=$(basename "$PNAME" 2>/dev/null | tr -d ' ')
+  case "$PNAME" in
+    zsh|bash|fish|sh|dash|tcsh|ksh|-zsh|-bash)
+      SHELL_PID=$PARENT
+      ;;
+  esac
+  CURRENT_PID=$PARENT
+done
+# Fallback: original 2-hop behavior
+if [ "$SHELL_PID" = "0" ]; then
+  SHELL_PID=$(ps -o ppid= -p $PPID 2>/dev/null | tr -d ' ')
+fi
 
 # Extract last assistant message (truncate to 150 chars, escape for JSON)
 LAST_MSG=$(echo "$INPUT" | jq -r '.last_assistant_message // .last_assistant_message // empty' | head -c 150 | tr '\n' ' ' | sed 's/"/\\"/g')
 
 # Read custom emojis from config
-CONFIG_FILE="$HOME/.claude/terminal-status/emoji-config.json"
+CONFIG_FILE="$HOME/.heydev/emoji-config.json"
 if [ -f "$CONFIG_FILE" ]; then
   WORKING_EMOJI=$(jq -r '.workingEmoji // "⚡"' "$CONFIG_FILE")
   WAITING_EMOJI=$(jq -r '.waitingEmoji // "👀"' "$CONFIG_FILE")
@@ -32,7 +52,7 @@ else
 fi
 
 # Write state file for the VS Code extension
-STATE_DIR="$HOME/.claude/terminal-status"
+STATE_DIR="$HOME/.heydev/state"
 mkdir -p "$STATE_DIR"
 echo "{\"session_id\":\"$SID\",\"tag\":\"$TAG\",\"state\":\"$STATE\",\"timestamp\":$(date +%s),\"shell_pid\":${SHELL_PID:-0},\"last_message\":\"$LAST_MSG\",\"tool\":\"$TOOL\"}" > "$STATE_DIR/$SID.json"
 

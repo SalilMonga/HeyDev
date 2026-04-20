@@ -38,11 +38,11 @@
     "commands": [
       {
         "command": "heydev.setup",
-        "title": "HeyDev: Setup Claude Code Integration"
+        "title": "HeyDev: Setup AI CLI Integration (Claude, Codex)"
       },
       {
         "command": "heydev.removeHooks",
-        "title": "HeyDev: Remove Hooks from Claude Code"
+        "title": "HeyDev: Remove All Hooks (Claude, Codex)"
       }
     ],
     "configuration": {
@@ -72,7 +72,7 @@
         "heydev.stateDirectory": {
           "type": "string",
           "default": "",
-          "description": "Override state file directory (default: ~/.claude/terminal-status)"
+          "description": "Override state file directory (default: ~/.heydev/state)"
         }
       }
     }

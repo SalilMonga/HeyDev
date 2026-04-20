@@ -6,19 +6,20 @@ import { execSync } from "child_process";
 import { SessionWatcher } from "./sessionWatcher.js";
 import { TerminalManager } from "./terminalManager.js";
 import { NotificationManager } from "./notificationManager.js";
-import { runSetup, runUninstall } from "./setup.js";
+import { ensureCodexTerminalTitleDisabled, runSetup, runUninstall } from "./setup.js";
 import { isProcessAlive } from "./types.js";
 import type { SessionState } from "./types.js";
 
-function syncEmojiConfig(stateDir: string): void {
+function syncEmojiConfig(): void {
   const config = vscode.workspace.getConfiguration("heydev");
   const emojiConfig = {
     workingEmoji: config.get<string>("workingEmoji", "⚡"),
     waitingEmoji: config.get<string>("waitingEmoji", "👀"),
   };
-  fs.mkdirSync(stateDir, { recursive: true });
+  const heydevDir = path.join(os.homedir(), ".heydev");
+  fs.mkdirSync(heydevDir, { recursive: true });
   fs.writeFileSync(
-    path.join(stateDir, "emoji-config.json"),
+    path.join(heydevDir, "emoji-config.json"),
     JSON.stringify(emojiConfig, null, 2)
   );
 }
@@ -26,7 +27,8 @@ function syncEmojiConfig(stateDir: string): void {
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const config = vscode.workspace.getConfiguration("heydev");
   const customDir = config.get<string>("stateDirectory", "");
-  const stateDir = customDir || path.join(os.homedir(), ".claude", "terminal-status");
+  const stateDir = customDir || path.join(os.homedir(), ".heydev", "state");
+  const codexHome = process.env.CODEX_HOME?.trim() || path.join(os.homedir(), ".codex");
 
   const watcher = new SessionWatcher(stateDir);
   const terminalMgr = new TerminalManager();
@@ -57,14 +59,35 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   }
 
+  // Migrate old state files from ~/.claude/terminal-status/ to ~/.heydev/state/
+  const oldStateDir = path.join(os.homedir(), ".claude", "terminal-status");
+  if (fs.existsSync(oldStateDir)) {
+    const newStateDir = path.join(os.homedir(), ".heydev", "state");
+    fs.mkdirSync(newStateDir, { recursive: true });
+    for (const file of fs.readdirSync(oldStateDir).filter(f => f.endsWith(".json") && f !== "emoji-config.json")) {
+      try {
+        fs.renameSync(path.join(oldStateDir, file), path.join(newStateDir, file));
+      } catch { /* skip */ }
+    }
+  }
+
+  // Keep backward compatibility for upgrades: silently fix older Codex title config.
+  try {
+    execSync("which codex", { stdio: "ignore" });
+    ensureCodexTerminalTitleDisabled();
+  } catch {
+    // Ignore if codex is absent or write fails; setup can still repair manually.
+  }
+
   // Check if setup is complete — prompt if any piece is missing
-  const hookScript = path.join(os.homedir(), ".claude", "scripts", "heydev-hook.sh");
+  const hookScript = path.join(os.homedir(), ".heydev", "heydev-hook.sh");
+  const oldHookScript = path.join(os.homedir(), ".claude", "scripts", "heydev-hook.sh");
   const claudeSettingsPath = path.join(os.homedir(), ".claude", "settings.json");
   const termTitle = vscode.workspace.getConfiguration("terminal.integrated.tabs").get<string>("title", "${process}");
 
   // Check Claude hooks
   let claudeSetupNeeded = false;
-  if (!fs.existsSync(hookScript)) {
+  if (!fs.existsSync(hookScript) && !fs.existsSync(oldHookScript)) {
     claudeSetupNeeded = true;
   } else if (!termTitle.includes("${sequence}")) {
     claudeSetupNeeded = true;
@@ -86,7 +109,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Check Codex hooks (only if codex is installed)
   let codexSetupNeeded = false;
-  const codexHooksPath = path.join(os.homedir(), ".codex", "hooks.json");
+  const codexHooksPath = path.join(codexHome, "hooks.json");
   try {
     execSync("which codex", { stdio: "ignore" });
     // Codex installed — check if HeyDev hooks configured
@@ -123,11 +146,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   // Sync emoji config on activation and when settings change
-  syncEmojiConfig(stateDir);
+  syncEmojiConfig();
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("heydev")) {
-        syncEmojiConfig(stateDir);
+        syncEmojiConfig();
       }
     })
   );

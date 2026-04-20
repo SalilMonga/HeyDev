@@ -14,7 +14,7 @@ const HEYDEV_HOOKS = {
       hooks: [
         {
           type: "command",
-          command: "~/.claude/scripts/heydev-hook.sh waiting",
+          command: "~/.heydev/heydev-hook.sh waiting Claude",
           async: true,
         },
       ],
@@ -25,7 +25,7 @@ const HEYDEV_HOOKS = {
       hooks: [
         {
           type: "command",
-          command: "~/.claude/scripts/heydev-hook.sh working",
+          command: "~/.heydev/heydev-hook.sh working Claude",
           async: true,
         },
       ],
@@ -36,7 +36,7 @@ const HEYDEV_HOOKS = {
       hooks: [
         {
           type: "command",
-          command: "~/.claude/scripts/heydev-hook.sh waiting",
+          command: "~/.heydev/heydev-hook.sh waiting Claude",
           async: true,
         },
       ],
@@ -47,7 +47,7 @@ const HEYDEV_HOOKS = {
       hooks: [
         {
           type: "command",
-          command: "~/.claude/scripts/heydev-hook.sh working",
+          command: "~/.heydev/heydev-hook.sh working Claude",
           async: true,
         },
       ],
@@ -61,7 +61,7 @@ const CODEX_HOOKS = {
       hooks: [
         {
           type: "command",
-          command: "~/.claude/scripts/heydev-hook.sh waiting Codex",
+          command: "~/.heydev/heydev-hook.sh waiting Codex",
           timeout: 10,
         },
       ],
@@ -72,7 +72,7 @@ const CODEX_HOOKS = {
       hooks: [
         {
           type: "command",
-          command: "~/.claude/scripts/heydev-hook.sh working Codex",
+          command: "~/.heydev/heydev-hook.sh working Codex",
           timeout: 10,
         },
       ],
@@ -83,7 +83,7 @@ const CODEX_HOOKS = {
       hooks: [
         {
           type: "command",
-          command: "~/.claude/scripts/heydev-hook.sh working Codex",
+          command: "~/.heydev/heydev-hook.sh working Codex",
           timeout: 10,
         },
       ],
@@ -108,6 +108,124 @@ function checkCommand(cmd: string): boolean {
   } catch {
     return false;
   }
+}
+
+function getCodexHome(): string {
+  const envHome = process.env.CODEX_HOME?.trim();
+  return envHome && envHome.length > 0
+    ? envHome
+    : path.join(os.homedir(), ".codex");
+}
+
+function ensureCodexTerminalTitleDisabledInToml(
+  content: string
+): { content: string; changed: boolean } {
+  const newline = content.includes("\r\n") ? "\r\n" : "\n";
+  const lines = content.length > 0 ? content.split(/\r?\n/) : [];
+  const outLines: string[] = [];
+  let currentSection = "";
+  let hasTuiSection = false;
+  let hasDisabledTitle = false;
+  let changed = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const sectionMatch = trimmed.match(/^\[([^\]]+)\]$/);
+
+    if (sectionMatch) {
+      if (currentSection === "tui" && !hasDisabledTitle) {
+        if (
+          outLines.length > 0 &&
+          outLines[outLines.length - 1].trim().length > 0
+        ) {
+          outLines.push("");
+        }
+        outLines.push("terminal_title = []");
+        hasDisabledTitle = true;
+        changed = true;
+      }
+
+      currentSection = sectionMatch[1].trim();
+      if (currentSection === "tui") hasTuiSection = true;
+      outLines.push(line);
+      continue;
+    }
+
+    // Migrate legacy (incorrect) root-level key from older HeyDev versions.
+    if (currentSection === "" && /^terminal_title\s*=/.test(trimmed)) {
+      changed = true;
+      continue;
+    }
+
+    // Support dotted style too.
+    if (/^tui\.terminal_title\s*=/.test(trimmed)) {
+      hasDisabledTitle = true;
+      if (!/^tui\.terminal_title\s*=\s*(\[\s*\]|null)\s*(#.*)?$/.test(trimmed)) {
+        outLines.push("tui.terminal_title = []");
+        changed = true;
+      } else if (/=\s*null\s*(#.*)?$/.test(trimmed)) {
+        // Normalize to [] for broader TOML parser compatibility.
+        outLines.push("tui.terminal_title = []");
+        changed = true;
+      } else {
+        outLines.push(line);
+      }
+      continue;
+    }
+
+    if (currentSection === "tui" && /^terminal_title\s*=/.test(trimmed)) {
+      hasDisabledTitle = true;
+      if (!/^terminal_title\s*=\s*(\[\s*\]|null)\s*(#.*)?$/.test(trimmed)) {
+        outLines.push("terminal_title = []");
+        changed = true;
+      } else if (/=\s*null\s*(#.*)?$/.test(trimmed)) {
+        // Normalize to [] for broader TOML parser compatibility.
+        outLines.push("terminal_title = []");
+        changed = true;
+      } else {
+        outLines.push(line);
+      }
+      continue;
+    }
+
+    outLines.push(line);
+  }
+
+  if (currentSection === "tui" && !hasDisabledTitle) {
+    if (outLines.length > 0 && outLines[outLines.length - 1].trim().length > 0) {
+      outLines.push("");
+    }
+    outLines.push("terminal_title = []");
+    hasDisabledTitle = true;
+    changed = true;
+  }
+
+  if (!hasTuiSection && !hasDisabledTitle) {
+    if (outLines.length > 0 && outLines[outLines.length - 1].trim().length > 0) {
+      outLines.push("");
+    }
+    outLines.push("[tui]");
+    outLines.push("terminal_title = []");
+    changed = true;
+  }
+
+  return { content: outLines.join(newline), changed };
+}
+
+export function ensureCodexTerminalTitleDisabled(): boolean {
+  const codexHome = getCodexHome();
+  const configToml = path.join(codexHome, "config.toml");
+  const original = fs.existsSync(configToml)
+    ? fs.readFileSync(configToml, "utf-8")
+    : "";
+  const result = ensureCodexTerminalTitleDisabledInToml(original);
+
+  if (!fs.existsSync(configToml) || result.changed) {
+    fs.mkdirSync(path.dirname(configToml), { recursive: true });
+    fs.writeFileSync(configToml, result.content);
+    return true;
+  }
+  return false;
 }
 
 async function checkClaude(): Promise<boolean> {
@@ -146,7 +264,7 @@ async function checkClaude(): Promise<boolean> {
 }
 
 function installHookScript(extensionPath: string): string {
-  const scriptDir = path.join(os.homedir(), ".claude", "scripts");
+  const scriptDir = path.join(os.homedir(), ".heydev");
   const scriptPath = path.join(scriptDir, "heydev-hook.sh");
 
   // Read the bundled hook script from the extension's install directory
@@ -216,7 +334,7 @@ function mergeClaudeSettings(): { added: string[]; skipped: string[] } {
 }
 
 function mergeCodexSettings(): { added: string[]; skipped: string[] } {
-  const hooksPath = path.join(os.homedir(), ".codex", "hooks.json");
+  const hooksPath = path.join(getCodexHome(), "hooks.json");
   const added: string[] = [];
   const skipped: string[] = [];
 
@@ -256,6 +374,13 @@ function mergeCodexSettings(): { added: string[]; skipped: string[] } {
   fs.mkdirSync(path.dirname(hooksPath), { recursive: true });
   fs.writeFileSync(hooksPath, JSON.stringify(hooksFile, null, 2));
 
+  // Disable Codex's built-in terminal title manager so HeyDev owns the tab title.
+  if (ensureCodexTerminalTitleDisabled()) {
+    added.push("Codex terminal title disabled");
+  } else {
+    skipped.push("Codex terminal title (already disabled)");
+  }
+
   return { added, skipped };
 }
 
@@ -292,7 +417,7 @@ export async function runSetup(extensionPath: string): Promise<void> {
   }
 
   // Step 5: Create state directory
-  const stateDir = path.join(os.homedir(), ".claude", "terminal-status");
+  const stateDir = path.join(os.homedir(), ".heydev", "state");
   fs.mkdirSync(stateDir, { recursive: true });
 
   // Step 6: Configure VS Code terminal title setting
@@ -337,24 +462,34 @@ export async function runSetup(extensionPath: string): Promise<void> {
 
   const message =
     added.length > 0
-      ? `HeyDev setup complete! Restart your Claude Code sessions to activate.\n\n${lines.join("\n")}`
+      ? `HeyDev setup complete! Restart your AI CLI sessions to activate.\n\n${lines.join("\n")}`
       : `HeyDev is already configured. ${lines.join(". ")}`;
 
-  const action = await vscode.window.showInformationMessage(
-    message,
-    added.length > 0 ? "Open Claude Settings" : "OK"
-  );
+  const hasCodex = checkCommand("codex");
+  const buttons: string[] = [];
+  if (added.length > 0) {
+    buttons.push("Open Claude Settings");
+    if (hasCodex) buttons.push("Open Codex Settings");
+  } else {
+    buttons.push("OK");
+  }
+
+  const action = await vscode.window.showInformationMessage(message, ...buttons);
 
   if (action === "Open Claude Settings") {
     const settingsPath = path.join(os.homedir(), ".claude", "settings.json");
     const doc = await vscode.workspace.openTextDocument(settingsPath);
+    await vscode.window.showTextDocument(doc);
+  } else if (action === "Open Codex Settings") {
+    const codexPath = path.join(getCodexHome(), "hooks.json");
+    const doc = await vscode.workspace.openTextDocument(codexPath);
     await vscode.window.showTextDocument(doc);
   }
 }
 
 export async function runUninstall(): Promise<void> {
   const confirm = await vscode.window.showWarningMessage(
-    "Remove HeyDev hooks from Claude Code settings?",
+    "Remove HeyDev hooks from all AI CLIs (Claude Code, Codex)?",
     "Yes",
     "Cancel"
   );
@@ -397,17 +532,14 @@ export async function runUninstall(): Promise<void> {
 
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 
-    // Remove hook script
-    const scriptPath = path.join(
-      os.homedir(),
-      ".claude",
-      "scripts",
-      "heydev-hook.sh"
-    );
+    // Remove hook script (check both old and new locations)
+    const scriptPath = path.join(os.homedir(), ".heydev", "heydev-hook.sh");
     if (fs.existsSync(scriptPath)) fs.unlinkSync(scriptPath);
+    const oldScriptPath = path.join(os.homedir(), ".claude", "scripts", "heydev-hook.sh");
+    if (fs.existsSync(oldScriptPath)) fs.unlinkSync(oldScriptPath);
 
     // Remove Codex hooks too
-    const codexHooksPath = path.join(os.homedir(), ".codex", "hooks.json");
+    const codexHooksPath = path.join(getCodexHome(), "hooks.json");
     if (fs.existsSync(codexHooksPath)) {
       try {
         const codexHooks: CodexHooksFile = JSON.parse(
@@ -450,7 +582,7 @@ export async function runUninstall(): Promise<void> {
     }
 
     vscode.window.showInformationMessage(
-      "HeyDev hooks removed. Restart Claude Code sessions to take effect."
+      "HeyDev hooks removed from all AI CLIs. Restart your sessions to take effect."
     );
   } catch {
     vscode.window.showErrorMessage("Failed to update Claude settings.");
