@@ -56,8 +56,9 @@ The VS Code status bar shows the state of the currently focused AI terminal sess
 
 ## Supported Tools
 
-- **Claude Code** — Fully supported today via hooks
-- **Codex, Copilot, Aider** — Planned for future releases
+- **Claude Code** — Fully supported via hooks
+- **OpenAI Codex CLI** — Fully supported via hooks
+- **Copilot, Aider** — Planned for future releases
 
 ## Installation
 
@@ -66,11 +67,12 @@ The VS Code status bar shows the state of the currently focused AI terminal sess
 1. Install **HeyDev** from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=salilmonga.heydev)
 2. Install **jq** if you don't have it: `brew install jq` (macOS) or [download](https://jqlang.github.io/jq/download/)
 3. Open VS Code → `Cmd+Shift+P` → **"HeyDev: Setup Claude Code Integration"**
-4. Restart your Claude Code sessions
+4. Restart your AI CLI sessions
 
 That's it. The setup command automatically:
 - Creates the hook script
 - Configures Claude Code hooks (preserving your existing hooks)
+- Detects and configures Codex CLI hooks if installed
 - Disables Claude's built-in title management
 - Creates the state directory
 
@@ -92,7 +94,7 @@ cd HeyDev
 npm install
 npm run compile
 npx @vscode/vsce package --allow-missing-repository
-code --install-extension heydev-0.3.3.vsix
+code --install-extension heydev-0.3.4.vsix
 ```
 
 ## Settings
@@ -112,21 +114,21 @@ Emoji changes sync automatically to the hook script — no manual editing needed
 ## How It Works
 
 ```
-AI CLI (e.g. Claude Code)
+AI CLI (Claude Code / Codex)
   ↓ (hooks fire on state changes)
-Hook Script (~/.claude/scripts/heydev-hook.sh)
+Hook Script (~/.claude/scripts/heydev-hook.sh <state> <tool>)
   ↓ writes state file          ↓ sets terminal title
-  ~/.claude/terminal-status/    Terminal tab: ⚡ Claude [a1b2] - Working
+  ~/.claude/terminal-status/    Terminal tab: ⚡ Codex [a1b2] - Working
   ↓ (fs.watch)
 VS Code Extension (HeyDev)
   ↓ maps session → terminal via PID
   ↓ sends notifications
-  VS Code notification: "[a1b2] has been waiting for 1 minute"
+  VS Code notification: "[a1b2] waiting: "what should I do next?""
     → [Focus Terminal] [Quick Reply]
 ```
 
 1. **Hooks** fire on AI CLI events (tool use, stop, user prompt)
-2. **Hook script** writes a JSON state file and sets the terminal title
+2. **Hook script** writes a JSON state file and sets the terminal title (tool-agnostic — works with Claude, Codex, etc.)
 3. **HeyDev extension** watches the state directory for changes
 4. **PID matching** maps each state file to the correct VS Code terminal
 5. **PID liveness** verifies the session process is still alive — dead session files are cleaned up automatically
@@ -137,7 +139,7 @@ VS Code Extension (HeyDev)
 
 - **VS Code** 1.85+
 - **macOS** (tested), Linux (should work), Windows (untested)
-- **Claude Code CLI** with hooks support
+- **Claude Code CLI** or **OpenAI Codex CLI** with hooks support
 - **Terminal**: Works in VS Code's integrated terminal
 
 ## License

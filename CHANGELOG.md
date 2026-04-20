@@ -2,6 +2,14 @@
 
 All notable changes to HeyDev will be documented in this file.
 
+## [0.3.4] - 2026-04-20
+
+### Added
+- **OpenAI Codex CLI support** — HeyDev now works with both Claude Code and Codex CLI out of the box
+- Tool-agnostic hook script — terminal tabs show tool name (e.g., "Codex [a1b2] - Working")
+- Auto-detection — setup command detects installed tools and configures hooks for each
+- Codex hooks cleanup on uninstall
+
 ## [0.3.3] - 2026-04-19
 
 ### Fixed

@@ -5,6 +5,7 @@ export interface SessionState {
   timestamp: number;
   shell_pid: number;
   last_message?: string;
+  tool?: string;
 }
 
 export interface TrackedTerminal {

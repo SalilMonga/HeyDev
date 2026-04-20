@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { execSync } from "child_process";
 import { SessionWatcher } from "./sessionWatcher.js";
 import { TerminalManager } from "./terminalManager.js";
 import { NotificationManager } from "./notificationManager.js";
@@ -61,11 +62,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const claudeSettingsPath = path.join(os.homedir(), ".claude", "settings.json");
   const termTitle = vscode.workspace.getConfiguration("terminal.integrated.tabs").get<string>("title", "${process}");
 
-  let setupNeeded = false;
+  // Check Claude hooks
+  let claudeSetupNeeded = false;
   if (!fs.existsSync(hookScript)) {
-    setupNeeded = true;
+    claudeSetupNeeded = true;
   } else if (!termTitle.includes("${sequence}")) {
-    setupNeeded = true;
+    claudeSetupNeeded = true;
   } else if (fs.existsSync(claudeSettingsPath)) {
     try {
       const settings = JSON.parse(fs.readFileSync(claudeSettingsPath, "utf-8"));
@@ -74,17 +76,44 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           e.hooks?.some((h) => h.command?.includes("heydev-hook.sh"))
         )
       );
-      if (!hasHooks) setupNeeded = true;
+      if (!hasHooks) claudeSetupNeeded = true;
     } catch {
-      setupNeeded = true;
+      claudeSetupNeeded = true;
     }
   } else {
-    setupNeeded = true;
+    claudeSetupNeeded = true;
   }
 
+  // Check Codex hooks (only if codex is installed)
+  let codexSetupNeeded = false;
+  const codexHooksPath = path.join(os.homedir(), ".codex", "hooks.json");
+  try {
+    execSync("which codex", { stdio: "ignore" });
+    // Codex installed — check if HeyDev hooks configured
+    if (fs.existsSync(codexHooksPath)) {
+      try {
+        const codexHooks = JSON.parse(fs.readFileSync(codexHooksPath, "utf-8"));
+        const hasHeydev = Object.values(codexHooks.hooks ?? {}).some((entries: unknown) =>
+          (entries as Array<{ hooks?: Array<{ command?: string }> }>).some((e) =>
+            e.hooks?.some((h) => h.command?.includes("heydev-hook.sh"))
+          )
+        );
+        if (!hasHeydev) codexSetupNeeded = true;
+      } catch {
+        codexSetupNeeded = true;
+      }
+    } else {
+      codexSetupNeeded = true;
+    }
+  } catch {
+    // Codex not installed — skip
+  }
+
+  const setupNeeded = claudeSetupNeeded || codexSetupNeeded;
   if (setupNeeded) {
+    const tools = [claudeSetupNeeded ? "Claude Code" : "", codexSetupNeeded ? "Codex" : ""].filter(Boolean).join(" & ");
     const action = await vscode.window.showInformationMessage(
-      "HeyDev needs setup to work. Configure Claude Code integration now?",
+      `HeyDev needs setup for ${tools}. Configure now?`,
       "Run Setup",
       "Later"
     );

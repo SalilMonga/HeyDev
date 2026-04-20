@@ -55,10 +55,50 @@ const HEYDEV_HOOKS = {
   ],
 };
 
+const CODEX_HOOKS = {
+  Stop: [
+    {
+      hooks: [
+        {
+          type: "command",
+          command: "~/.claude/scripts/heydev-hook.sh waiting Codex",
+          timeout: 10,
+        },
+      ],
+    },
+  ],
+  PostToolUse: [
+    {
+      hooks: [
+        {
+          type: "command",
+          command: "~/.claude/scripts/heydev-hook.sh working Codex",
+          timeout: 10,
+        },
+      ],
+    },
+  ],
+  UserPromptSubmit: [
+    {
+      hooks: [
+        {
+          type: "command",
+          command: "~/.claude/scripts/heydev-hook.sh working Codex",
+          timeout: 10,
+        },
+      ],
+    },
+  ],
+};
+
 interface ClaudeSettings {
   env?: Record<string, string>;
   hooks?: Record<string, unknown[]>;
   [key: string]: unknown;
+}
+
+interface CodexHooksFile {
+  hooks?: Record<string, unknown[]>;
 }
 
 function checkCommand(cmd: string): boolean {
@@ -175,6 +215,50 @@ function mergeClaudeSettings(): { added: string[]; skipped: string[] } {
   return { added, skipped };
 }
 
+function mergeCodexSettings(): { added: string[]; skipped: string[] } {
+  const hooksPath = path.join(os.homedir(), ".codex", "hooks.json");
+  const added: string[] = [];
+  const skipped: string[] = [];
+
+  let hooksFile: CodexHooksFile = {};
+  if (fs.existsSync(hooksPath)) {
+    try {
+      hooksFile = JSON.parse(fs.readFileSync(hooksPath, "utf-8"));
+    } catch {
+      const backupPath = hooksPath + ".backup";
+      fs.copyFileSync(hooksPath, backupPath);
+      hooksFile = {};
+    }
+  }
+
+  if (!hooksFile.hooks) hooksFile.hooks = {};
+
+  for (const [event, hookEntries] of Object.entries(CODEX_HOOKS)) {
+    const existing = hooksFile.hooks[event] as unknown[] | undefined;
+
+    const hasHeydev = existing?.some((entry: unknown) => {
+      const e = entry as { hooks?: Array<{ command?: string }> };
+      return e.hooks?.some((h) => h.command?.includes("heydev-hook.sh"));
+    });
+
+    if (hasHeydev) {
+      skipped.push(`Codex ${event} hook (already configured)`);
+    } else {
+      if (existing) {
+        hooksFile.hooks[event] = [...existing, ...hookEntries];
+      } else {
+        hooksFile.hooks[event] = hookEntries;
+      }
+      added.push(`Codex ${event} hook`);
+    }
+  }
+
+  fs.mkdirSync(path.dirname(hooksPath), { recursive: true });
+  fs.writeFileSync(hooksPath, JSON.stringify(hooksFile, null, 2));
+
+  return { added, skipped };
+}
+
 export async function runSetup(extensionPath: string): Promise<void> {
   // Step 1: Check for Claude Code
   const claudeOk = await checkClaude();
@@ -199,6 +283,13 @@ export async function runSetup(extensionPath: string): Promise<void> {
 
   // Step 4: Merge Claude settings
   const { added, skipped } = mergeClaudeSettings();
+
+  // Step 4b: Merge Codex settings if Codex is installed
+  if (checkCommand("codex")) {
+    const codexResult = mergeCodexSettings();
+    added.push(...codexResult.added);
+    skipped.push(...codexResult.skipped);
+  }
 
   // Step 5: Create state directory
   const stateDir = path.join(os.homedir(), ".claude", "terminal-status");
@@ -314,6 +405,32 @@ export async function runUninstall(): Promise<void> {
       "heydev-hook.sh"
     );
     if (fs.existsSync(scriptPath)) fs.unlinkSync(scriptPath);
+
+    // Remove Codex hooks too
+    const codexHooksPath = path.join(os.homedir(), ".codex", "hooks.json");
+    if (fs.existsSync(codexHooksPath)) {
+      try {
+        const codexHooks: CodexHooksFile = JSON.parse(
+          fs.readFileSync(codexHooksPath, "utf-8")
+        );
+        if (codexHooks.hooks) {
+          for (const event of Object.keys(codexHooks.hooks)) {
+            const entries = codexHooks.hooks[event] as unknown[];
+            codexHooks.hooks[event] = entries.filter((entry: unknown) => {
+              const e = entry as { hooks?: Array<{ command?: string }> };
+              return !e.hooks?.some((h) => h.command?.includes("heydev-hook.sh"));
+            });
+            if ((codexHooks.hooks[event] as unknown[]).length === 0) {
+              delete codexHooks.hooks[event];
+            }
+          }
+          if (Object.keys(codexHooks.hooks).length === 0) delete codexHooks.hooks;
+        }
+        fs.writeFileSync(codexHooksPath, JSON.stringify(codexHooks, null, 2));
+      } catch {
+        // Codex hooks file unreadable — skip
+      }
+    }
 
     // Offer to revert VS Code terminal title setting
     const termConfig = vscode.workspace.getConfiguration("terminal.integrated.tabs");
