@@ -14,6 +14,7 @@ export interface TrackedTerminal {
   sessionId: string | undefined;
   currentState: "working" | "waiting" | "unknown";
   tag: string | undefined;
+  tool: string | undefined;
 }
 
 /** Check if a process is still alive (signal 0 = existence check). */

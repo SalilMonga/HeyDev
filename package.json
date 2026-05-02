@@ -75,7 +75,67 @@
           "description": "Override state file directory (default: ~/.heydev/state)"
         }
       }
-    }
+    },
+    "walkthroughs": [
+      {
+        "id": "heydev.gettingStarted",
+        "title": "Getting Started with HeyDev",
+        "description": "Set up live AI CLI status indicators in your terminal tabs",
+        "steps": [
+          {
+            "id": "heydev.welcome",
+            "title": "Welcome to HeyDev",
+            "description": "HeyDev shows live status indicators in your terminal tabs when running AI CLI sessions.\n\n**⚡ Working** — your AI agent is using tools\n\n**👀 Waiting** — your AI agent needs your input\n\nPlus smart notifications and Quick Reply.",
+            "media": {
+              "image": "images/screenshot-tabs.png",
+              "altText": "Terminal tabs showing Working and Waiting states"
+            }
+          },
+          {
+            "id": "heydev.installJq",
+            "title": "Install jq (required)",
+            "description": "HeyDev needs ``jq`` to parse JSON from AI CLI sessions.\n\n**macOS:** ``brew install jq``\n\n**Linux:** ``sudo apt-get install jq``\n\nVerify: ``jq --version``",
+            "media": {
+              "markdown": "media/install-jq.md"
+            }
+          },
+          {
+            "id": "heydev.runSetup",
+            "title": "Run Setup",
+            "description": "One command configures everything — hooks, state directory, and terminal settings.\n\n[Run Setup](command:heydev.setup)",
+            "media": {
+              "image": "images/screenshot-settings.png",
+              "altText": "HeyDev extension settings"
+            },
+            "completionEvents": [
+              "onCommand:heydev.setup"
+            ]
+          },
+          {
+            "id": "heydev.restartCli",
+            "title": "Restart your AI CLI sessions",
+            "description": "Close and reopen your Claude Code or Codex terminal sessions for hooks to take effect.\n\nOnce restarted, your terminal tabs will show live status indicators like:\n\n``⚡ Claude [a1b2] - Working``",
+            "media": {
+              "image": "images/screenshot-notification.png",
+              "altText": "Smart notification with Focus Terminal and Quick Reply"
+            }
+          },
+          {
+            "id": "heydev.customize",
+            "title": "Customize your experience",
+            "description": "Tweak notification delay, emojis, and more in settings.\n\n[Open HeyDev Settings](command:workbench.action.openSettings?%5B%22heydev%22%5D)",
+            "media": {
+              "markdown": "media/setup-complete.md"
+            },
+            "completionEvents": [
+              "onSettingChanged:heydev.notificationDelaySeconds",
+              "onSettingChanged:heydev.workingEmoji",
+              "onSettingChanged:heydev.waitingEmoji"
+            ]
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "compile": "tsc -p ./",

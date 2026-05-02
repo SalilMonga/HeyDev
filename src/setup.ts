@@ -491,8 +491,8 @@ export async function runSetup(extensionPath: string): Promise<void> {
     output.appendLine(`  Codex:  ${path.join(getCodexHome(), "hooks.json")}`);
   }
 
-  const action = await vscode.window.showInformationMessage(
-    `HeyDev configured for ${tools.join(" & ")}. Restart your AI sessions to activate.`,
+  const action = await vscode.window.showWarningMessage(
+    `HeyDev configured for ${tools.join(" & ")}. Restart your AI CLI sessions (close & reopen terminal) to activate hooks.`,
     "View Details",
     "Open Settings"
   );

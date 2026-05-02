@@ -89,6 +89,7 @@ export class TerminalManager {
         sessionId: state.session_id,
         currentState: state.state,
         tag: state.tag,
+        tool: state.tool,
       });
 
       // Update status bar if this is the active terminal
@@ -125,8 +126,9 @@ export class TerminalManager {
       if (tracked.terminal === terminal) {
         const icon = tracked.currentState === "working" ? "$(zap)" : "$(eye)";
         const stateText = tracked.currentState === "working" ? "Working" : "Waiting";
-        this.statusBarItem.text = `${icon} [${tracked.tag}] ${stateText}`;
-        this.statusBarItem.tooltip = `Session ${tracked.tag} is ${stateText.toLowerCase()}`;
+        const toolLabel = tracked.tool ? `${tracked.tool} ` : "";
+        this.statusBarItem.text = `${icon} ${toolLabel}[${tracked.tag}] ${stateText}`;
+        this.statusBarItem.tooltip = `${toolLabel}Session ${tracked.tag} is ${stateText.toLowerCase()}`;
         this.statusBarItem.show();
         return;
       }

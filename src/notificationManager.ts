@@ -120,8 +120,8 @@ export class NotificationManager {
         prompt: `Reply to [${state.tag}]`,
         placeHolder: "Type your response (e.g. yes, no, continue...)",
       });
-      if (reply !== undefined && reply !== "") {
-        terminal.sendText(reply);
+      if (reply !== undefined && reply.trim() !== "") {
+        terminal.sendText(reply.trim());
       }
     }
   }
