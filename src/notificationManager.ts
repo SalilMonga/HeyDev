@@ -1,40 +1,75 @@
 import * as vscode from "vscode";
+import * as path from "path";
+import * as cp from "child_process";
+import * as notifier from "node-notifier";
 import type { SessionState } from "./types.js";
 import type { TerminalManager } from "./terminalManager.js";
 
 export class NotificationManager {
   private terminalManager: TerminalManager;
-  // Pending notification timers per session — cancelled if state changes or terminal focused
+  private extensionPath: string;
+  private outputChannel: vscode.OutputChannel;
+  // Pending in-app notification timers per session — cancelled if state changes or terminal focused
   private pendingTimers = new Map<string, NodeJS.Timeout>();
-  // Track which sessions have a visible notification so we can ignore stale clicks
+  // Pending mac escalation timers per session — scheduled after in-app fires
+  private pendingMacTimers = new Map<string, NodeJS.Timeout>();
+  // Active mac notification group IDs (for programmatic dismissal via terminal-notifier -remove)
+  private activeMacNotifGroups = new Map<string, string>();
+  // Track which sessions have a visible in-app notification so we can ignore stale clicks
   private activeNotifications = new Set<string>();
   // Track sessions that have already been notified — don't re-notify until state cycles back through "working"
-  private alreadyNotified = new Set<string>();
+  private _alreadyNotified = new Set<string>();
   private disposables: vscode.Disposable[] = [];
 
-  constructor(terminalManager: TerminalManager) {
+  // Traced accessors for alreadyNotified — log every add/delete so we can see exactly when state changes.
+  private alreadyNotifiedAdd(sessionId: string, source: string): void {
+    this._alreadyNotified.add(sessionId);
+    this.outputChannel.appendLine(
+      `[alreadyNotified] +ADD session ${sessionId} (by ${source}) — set size: ${this._alreadyNotified.size}`
+    );
+  }
+  private alreadyNotifiedDelete(sessionId: string, source: string): void {
+    const had = this._alreadyNotified.has(sessionId);
+    this._alreadyNotified.delete(sessionId);
+    this.outputChannel.appendLine(
+      `[alreadyNotified] -DEL session ${sessionId} (by ${source}) — had=${had} set size: ${this._alreadyNotified.size}`
+    );
+  }
+  private get alreadyNotified() {
+    return {
+      has: (id: string) => this._alreadyNotified.has(id),
+      // Compatibility stubs — should never be called directly; use traced helpers
+      add: (id: string) => this.alreadyNotifiedAdd(id, "direct"),
+      delete: (id: string) => this.alreadyNotifiedDelete(id, "direct"),
+      clear: () => this._alreadyNotified.clear(),
+    };
+  }
+
+  constructor(terminalManager: TerminalManager, extensionPath: string) {
     this.terminalManager = terminalManager;
+    this.extensionPath = extensionPath;
+    this.outputChannel = vscode.window.createOutputChannel("HeyDev");
   }
 
   start(): void {
     // Cancel everything when a terminal is closed
     this.terminalManager.onTerminalClosed((sessionId) => {
-      this.cancelPending(sessionId);
-      this.activeNotifications.delete(sessionId);
-      this.alreadyNotified.delete(sessionId);
+      this.cancelAll(sessionId, "terminal closed");
+      this.alreadyNotifiedDelete(sessionId, "terminal closed");
     });
 
-    // Cancel pending notifications when user manually switches to a Claude terminal
+    // Cancel pending notifications when user manually switches to a Claude terminal.
+    // Note: we do NOT add to alreadyNotified here — that would persist across waiting
+    // cycles. The activeTerminal guard in showNotification handles "currently looking."
     this.disposables.push(
       vscode.window.onDidChangeActiveTerminal((terminal) => {
         if (!terminal) return;
-        // Find which session this terminal belongs to
         for (const [sessionId, tracked] of this.terminalManager.getAllSessions()) {
           if (tracked.terminal === terminal) {
-            this.cancelPending(sessionId);
-            // Mark notification as stale so clicks are ignored, and prevent re-notify
-            this.activeNotifications.delete(sessionId);
-            this.alreadyNotified.add(sessionId);
+            this.outputChannel.appendLine(
+              `[focus] terminal for session ${sessionId} became active — cancelling pending`
+            );
+            this.cancelAll(sessionId, "terminal focused");
             break;
           }
         }
@@ -44,31 +79,57 @@ export class NotificationManager {
 
   /** Called on every state change. Schedules or cancels notifications. */
   handleStateChange(state: SessionState): void {
+    this.outputChannel.appendLine(
+      `[state] session ${state.session_id} -> ${state.state} (tag=${state.tag})`
+    );
     if (state.state === "waiting") {
       this.scheduleNotification(state);
     } else {
-      // State changed to "working" — cancel any pending notification and reset notified flag
-      this.cancelPending(state.session_id);
-      this.activeNotifications.delete(state.session_id);
-      this.alreadyNotified.delete(state.session_id);
+      // State changed to "working" — cancel pending in-app + mac, dismiss active mac, reset notified flag
+      this.cancelAll(state.session_id, "state -> working");
+      this.alreadyNotifiedDelete(state.session_id, "state -> working");
     }
   }
 
   private scheduleNotification(state: SessionState): void {
     const config = vscode.workspace.getConfiguration("heydev");
-    if (!config.get<boolean>("showNotifications", true)) return;
+    if (!config.get<boolean>("showNotifications", true)) {
+      this.outputChannel.appendLine(
+        `[in-app] skipped for session ${state.session_id} (showNotifications=false)`
+      );
+      return;
+    }
 
     // Only notify for sessions that belong to a terminal in THIS VS Code instance
-    if (!this.terminalManager.getTerminalForSession(state.session_id)) return;
+    if (!this.terminalManager.getTerminalForSession(state.session_id)) {
+      this.outputChannel.appendLine(
+        `[in-app] skipped for session ${state.session_id} (terminal not tracked in this window)`
+      );
+      return;
+    }
 
     // Don't re-notify if we already sent one for this waiting period
-    if (this.alreadyNotified.has(state.session_id)) return;
+    if (this.alreadyNotified.has(state.session_id)) {
+      this.outputChannel.appendLine(
+        `[in-app] skipped for session ${state.session_id} (alreadyNotified)`
+      );
+      return;
+    }
 
     // Don't schedule if there's already a pending timer
-    if (this.pendingTimers.has(state.session_id)) return;
+    if (this.pendingTimers.has(state.session_id)) {
+      this.outputChannel.appendLine(
+        `[in-app] skipped for session ${state.session_id} (timer already pending)`
+      );
+      return;
+    }
 
     const delaySeconds = config.get<number>("notificationDelaySeconds", 60);
     const delayMs = delaySeconds * 1000;
+
+    this.outputChannel.appendLine(
+      `[in-app] scheduled for session ${state.session_id} in ${delaySeconds}s`
+    );
 
     const timer = setTimeout(() => {
       this.pendingTimers.delete(state.session_id);
@@ -82,7 +143,16 @@ export class NotificationManager {
     const terminal = this.terminalManager.getTerminalForSession(state.session_id);
 
     // Don't notify if the terminal is already focused
-    if (terminal && vscode.window.activeTerminal === terminal) return;
+    if (terminal && vscode.window.activeTerminal === terminal) {
+      this.outputChannel.appendLine(
+        `[in-app] suppressed for session ${state.session_id} (terminal is active)`
+      );
+      return;
+    }
+
+    this.outputChannel.appendLine(
+      `[in-app] firing for session ${state.session_id}`
+    );
 
     const timeLabel = delaySeconds >= 60
       ? `${Math.round(delaySeconds / 60)} minute${Math.round(delaySeconds / 60) > 1 ? "s" : ""}`
@@ -99,13 +169,19 @@ export class NotificationManager {
 
     // Mark this notification as active and already notified
     this.activeNotifications.add(state.session_id);
-    this.alreadyNotified.add(state.session_id);
+    this.alreadyNotifiedAdd(state.session_id, "showNotification");
+
+    // Schedule mac escalation in parallel with awaiting in-app interaction
+    this.scheduleMacEscalation(state, snippet);
 
     const action = await vscode.window.showInformationMessage(
       message,
       "Focus Terminal",
       "Quick Reply"
     );
+
+    // Any in-app interaction (or dismissal) cancels the mac escalation
+    this.cancelMacEscalation(state.session_id, "in-app interaction");
 
     // If notification was dismissed (user switched to terminal manually), ignore the click
     if (!this.activeNotifications.has(state.session_id)) return;
@@ -126,12 +202,173 @@ export class NotificationManager {
     }
   }
 
-  private cancelPending(sessionId: string): void {
+  private scheduleMacEscalation(state: SessionState, snippet: string): void {
+    if (process.platform !== "darwin") return;
+
+    const config = vscode.workspace.getConfiguration("heydev");
+    if (!config.get<boolean>("enableMacNotifications", true)) return;
+
+    if (this.pendingMacTimers.has(state.session_id)) return;
+
+    const delaySeconds = config.get<number>("macNotificationDelaySeconds", 30);
+    const workspacePath = this.getWorkspacePath();
+    const playSound = config.get<boolean>("macNotificationSound", false);
+
+    this.outputChannel.appendLine(
+      `[mac-notif] scheduled for session ${state.session_id} in ${delaySeconds}s`
+    );
+
+    const timer = setTimeout(() => {
+      this.pendingMacTimers.delete(state.session_id);
+      this.fireMacNotification(state, snippet, workspacePath, playSound);
+    }, delaySeconds * 1000);
+
+    this.pendingMacTimers.set(state.session_id, timer);
+  }
+
+  private fireMacNotification(
+    state: SessionState,
+    snippet: string,
+    workspacePath: string | undefined,
+    playSound: boolean
+  ): void {
+    const terminal = this.terminalManager.getTerminalForSession(state.session_id);
+    // Last-second guard: if terminal got focused while timer was running, skip
+    if (terminal && vscode.window.activeTerminal === terminal) {
+      this.outputChannel.appendLine(
+        `[mac-notif] suppressed for session ${state.session_id} (terminal focused)`
+      );
+      return;
+    }
+
+    const groupId = `heydev-${state.session_id}`;
+    this.activeMacNotifGroups.set(state.session_id, groupId);
+
+    const iconPath = path.join(this.extensionPath, "images", "icon.png");
+    const message = snippet
+      ? snippet.replace(/^: /, "").replace(/^"|"$/g, "")
+      : "AI session needs your attention";
+
+    // Spawn terminal-notifier directly with detached:true so it escapes the extension host's
+    // process group. node-notifier's default spawn keeps the child attached, and VS Code's
+    // hardened-runtime extension host appears to block notification UI from attached children.
+    const terminalNotifierPath = path.join(
+      this.extensionPath,
+      "node_modules",
+      "node-notifier",
+      "vendor",
+      "mac.noindex",
+      "terminal-notifier.app",
+      "Contents",
+      "MacOS",
+      "terminal-notifier"
+    );
+
+    const args = [
+      "-title", `[${state.tag}] waiting`,
+      "-message", message,
+      "-appIcon", iconPath,
+      "-group", groupId,
+      "-timeout", "30",
+    ];
+    if (playSound) args.push("-sound", "default");
+
+    this.outputChannel.appendLine(
+      `[mac-notif] fired for session ${state.session_id} (binary=${terminalNotifierPath})`
+    );
+
+    const child = cp.spawn(terminalNotifierPath, args, {
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    // Collect stdout for click detection. terminal-notifier emits @CONTENTCLICKED on click,
+    // @TIMEOUT on auto-dismiss, @CLOSED on user dismissal.
+    let stdoutBuf = "";
+    child.stdout?.on("data", (chunk: Buffer) => {
+      stdoutBuf += chunk.toString();
+    });
+    child.on("error", (err) => {
+      this.outputChannel.appendLine(
+        `[mac-notif] spawn error: ${err.message}`
+      );
+      this.activeMacNotifGroups.delete(state.session_id);
+    });
+    child.on("close", (code) => {
+      this.outputChannel.appendLine(
+        `[mac-notif] subprocess exited code=${code} stdout="${stdoutBuf.trim()}"`
+      );
+      // terminal-notifier emits: @CONTENTCLICKED (body click), @ACTIONCLICKED (action button),
+      // @TIMEOUT (auto-dismiss), @CLOSED (manual dismiss). Treat any "click" type as a click.
+      const wasClicked =
+        stdoutBuf.includes("@CONTENTCLICKED") ||
+        stdoutBuf.includes("@ACTIONCLICKED") ||
+        stdoutBuf.includes("activate");
+      if (wasClicked) {
+        this.outputChannel.appendLine(
+          `[mac-notif] click handler invoked, focusing window at ${workspacePath ?? "(no workspace)"}`
+        );
+        this.focusVSCodeWindow(workspacePath);
+      }
+      this.activeMacNotifGroups.delete(state.session_id);
+    });
+    // Detach the child so it can outlive the extension host's process group if needed.
+    child.unref();
+  }
+
+  private cancelMacEscalation(sessionId: string, reason: string): void {
+    const timer = this.pendingMacTimers.get(sessionId);
+    if (timer) {
+      clearTimeout(timer);
+      this.pendingMacTimers.delete(sessionId);
+      this.outputChannel.appendLine(
+        `[mac-notif] cancelled for session ${sessionId} (${reason})`
+      );
+    }
+    const groupId = this.activeMacNotifGroups.get(sessionId);
+    if (groupId) {
+      this.dismissActiveMacNotif(groupId);
+      this.activeMacNotifGroups.delete(sessionId);
+    }
+  }
+
+  private dismissActiveMacNotif(groupId: string): void {
+    if (process.platform !== "darwin") return;
+    // terminal-notifier -remove <group> dismisses the notification by group ID
+    // Cast to any — `remove` is a valid terminal-notifier flag but missing from @types/node-notifier
+    notifier.notify({ remove: groupId } as any, () => {
+      // Ignore errors — best-effort dismissal
+    });
+  }
+
+  private focusVSCodeWindow(workspacePath: string | undefined): void {
+    const appName = vscode.env.appName || "Visual Studio Code";
+    const args = workspacePath ? ["-a", appName, workspacePath] : ["-a", appName];
+    cp.execFile("open", args, (err) => {
+      if (err) {
+        this.outputChannel.appendLine(
+          `[mac-notif] open failed: ${err.message}`
+        );
+      }
+    });
+  }
+
+  private getWorkspacePath(): string | undefined {
+    const wsFile = vscode.workspace.workspaceFile;
+    if (wsFile && wsFile.scheme === "file") return wsFile.fsPath;
+    const folders = vscode.workspace.workspaceFolders;
+    if (folders && folders.length > 0) return folders[0].uri.fsPath;
+    return undefined;
+  }
+
+  private cancelAll(sessionId: string, reason: string): void {
     const timer = this.pendingTimers.get(sessionId);
     if (timer) {
       clearTimeout(timer);
       this.pendingTimers.delete(sessionId);
     }
+    this.cancelMacEscalation(sessionId, reason);
+    this.activeNotifications.delete(sessionId);
   }
 
   dispose(): void {
@@ -139,10 +376,19 @@ export class NotificationManager {
       clearTimeout(timer);
     }
     this.pendingTimers.clear();
+    for (const timer of this.pendingMacTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.pendingMacTimers.clear();
+    for (const groupId of this.activeMacNotifGroups.values()) {
+      this.dismissActiveMacNotif(groupId);
+    }
+    this.activeMacNotifGroups.clear();
     this.activeNotifications.clear();
-    this.alreadyNotified.clear();
+    this._alreadyNotified.clear();
     for (const d of this.disposables) {
       d.dispose();
     }
+    this.outputChannel.dispose();
   }
 }

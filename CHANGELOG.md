@@ -2,6 +2,39 @@
 
 All notable changes to HeyDev will be documented in this file.
 
+## [0.4.4] - 2026-05-12
+
+### Fixed
+- macOS notification not appearing despite the extension's fire path completing successfully. node-notifier's default spawn keeps terminal-notifier attached to the extension host's process group, and VS Code's hardened-runtime extension host appears to suppress notification UI from attached children. Switched to direct `child_process.spawn` with `detached: true` so terminal-notifier runs in its own process group.
+
+## [0.4.3] - 2026-05-12
+
+### Added
+- Aggressive tracing of `alreadyNotified` set mutations for debugging notification flow.
+
+## [0.4.2] - 2026-05-12
+
+### Fixed
+- Notifications could be incorrectly suppressed across waiting cycles. The `onDidChangeActiveTerminal` listener used to add the session to `alreadyNotified`, but macOS Space restoration re-fires this event when returning to VS Code, blocking the next legitimate notification cycle. Removed the redundant flag set — the existing `activeTerminal` guard at fire time still handles the "user is currently looking at the terminal" case.
+
+### Added
+- Logging for terminal focus events in the HeyDev Output Channel.
+
+## [0.4.1] - 2026-05-12
+
+### Added
+- Diagnostic logging in the HeyDev Output Channel for the full notification lifecycle: state arrivals, in-app scheduled/firing/suppressed/skipped, mac scheduled/fired/cancelled/click. Makes debugging notification behavior easy.
+
+## [0.4.0] - 2026-05-12
+
+### Added
+- **macOS notification escalation** — if the in-app notification is not interacted with within a configurable delay, HeyDev now fires a native macOS notification. Clicking the notification focuses the originating VS Code window so you land on the correct workspace, even when running multiple VS Code instances.
+- New configuration settings:
+  - `heydev.enableMacNotifications` (default `true`) — toggle macOS escalation
+  - `heydev.macNotificationDelaySeconds` (default `30`) — seconds to wait after the in-app notification before escalating
+  - `heydev.macNotificationSound` (default `false`) — play sound when the macOS notification fires
+- `node-notifier` runtime dependency — bundles `terminal-notifier.app`, no system install required.
+
 ## [0.3.4] - 2026-04-20
 
 ### Added

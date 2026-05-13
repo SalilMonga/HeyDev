@@ -1,5 +1,14 @@
 .vscode/**
 node_modules/**
+!node_modules/node-notifier/**
+!node_modules/growly/**
+!node_modules/is-wsl/**
+!node_modules/is-docker/**
+!node_modules/semver/**
+!node_modules/shellwords/**
+!node_modules/uuid/**
+!node_modules/which/**
+!node_modules/isexe/**
 src/**
 documents/**
 tsconfig.json
@@ -8,3 +17,8 @@ CONTRIBUTING.md
 images/*.html
 **/*.map
 **/*.ts
+**/test/**
+**/tests/**
+**/example/**
+**/examples/**
+**/.github/**

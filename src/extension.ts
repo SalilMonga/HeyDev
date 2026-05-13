@@ -32,7 +32,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const watcher = new SessionWatcher(stateDir);
   const terminalMgr = new TerminalManager();
-  const notificationMgr = new NotificationManager(terminalMgr);
+  const notificationMgr = new NotificationManager(terminalMgr, context.extensionPath);
 
   // Register commands
   const extPath = context.extensionPath;
