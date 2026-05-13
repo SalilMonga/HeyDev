@@ -267,6 +267,7 @@ unzip -l heydev-X.Y.Z.vsix | grep node-notifier/vendor
 - **Click-to-focus verification:** Initial implementation detected only `@CONTENTCLICKED`. terminal-notifier on macOS 15 emits `@ACTIONCLICKED` when the body is clicked. Detection now handles both.
 - **Cross-platform escalation:** Windows and Linux escalation deferred to v2.
 - **Smart focus detection (originally proposed Plan D):** detect whether the VS Code app is foregrounded. If not focused, skip in-app and go straight to mac notif. Deferred to v2 once base flow is stable.
+- **Lingering in-app popup after mac click:** When the user clicks the mac notification, we foreground VS Code and call `terminal.show()`. But the awaiting `showInformationMessage` popup stays visible as a stale visual — VS Code does not expose programmatic dismissal of a specific notification. Attempted workaround (`notifications.focusFirstToast` + `notifications.acceptPrimaryAction`) did not reliably dismiss it in testing. Acceptable v1 UX: user can dismiss the stale popup manually via X or its "Focus Terminal" button (which is a no-op since the terminal is already focused). Future work: redesign the in-app UX using a mechanism we fully control (status bar item, `withProgress` with cancel token, or webview).
 
 ## Changelog entry
 

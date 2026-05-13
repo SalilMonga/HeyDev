@@ -7,6 +7,13 @@ All notable changes to HeyDev will be documented in this file.
 ### Fixed
 - macOS notification not appearing despite the extension's fire path completing successfully. node-notifier's default spawn keeps terminal-notifier attached to the extension host's process group, and VS Code's hardened-runtime extension host appears to suppress notification UI from attached children. Switched to direct `child_process.spawn` with `detached: true` so terminal-notifier runs in its own process group.
 
+### Added
+- Mac notification click now both foregrounds VS Code and calls `terminal.show()` on the target session — equivalent to clicking the in-app "Focus Terminal" button.
+- Click detection handles `@CONTENTCLICKED` and `@ACTIONCLICKED` (terminal-notifier on macOS 15 emits the latter for body clicks).
+
+### Known issues
+- The in-app `showInformationMessage` popup stays visible as a stale visual after the mac notification is clicked. VS Code does not expose programmatic per-notification dismissal. Future work: redesign the in-app UX.
+
 ## [0.4.3] - 2026-05-12
 
 ### Added

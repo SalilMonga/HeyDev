@@ -306,9 +306,27 @@ export class NotificationManager {
         stdoutBuf.includes("activate");
       if (wasClicked) {
         this.outputChannel.appendLine(
-          `[mac-notif] click handler invoked, focusing window at ${workspacePath ?? "(no workspace)"}`
+          `[mac-notif] click handler invoked for session ${state.session_id}`
         );
+        // Bring VS Code app to foreground (from a background space / another app).
         this.focusVSCodeWindow(workspacePath);
+        // Then focus the specific terminal — same as in-app "Focus Terminal" button.
+        const targetTerminal = this.terminalManager.getTerminalForSession(state.session_id);
+        if (targetTerminal) {
+          this.outputChannel.appendLine(
+            `[mac-notif] calling terminal.show() for session ${state.session_id}`
+          );
+          targetTerminal.show();
+        } else {
+          this.outputChannel.appendLine(
+            `[mac-notif] no terminal tracked for session ${state.session_id} — window focus only`
+          );
+        }
+        // Note: the in-app showInformationMessage popup will linger here. VS Code does
+        // not expose programmatic dismissal of a specific notification, and attempted
+        // workarounds (notifications.acceptPrimaryAction) did not reliably dismiss it.
+        // Tracked as a known limitation; future work: redesign the in-app UX to use a
+        // mechanism we fully control (e.g. status bar item or withProgress).
       }
       this.activeMacNotifGroups.delete(state.session_id);
     });
