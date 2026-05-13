@@ -38,7 +38,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const extPath = context.extensionPath;
   context.subscriptions.push(
     vscode.commands.registerCommand("heydev.setup", () => runSetup(extPath)),
-    vscode.commands.registerCommand("heydev.removeHooks", runUninstall)
+    vscode.commands.registerCommand("heydev.removeHooks", runUninstall),
+    vscode.commands.registerCommand("heydev.openSettings", () =>
+      vscode.commands.executeCommand("workbench.action.openSettings", "heydev")
+    ),
+    vscode.commands.registerCommand("heydev.quickReply", async () => {
+      const waiting = notificationMgr.getWaitingSessions();
+      if (waiting.length === 0) {
+        vscode.window.showInformationMessage("No AI CLI sessions are currently waiting.");
+        return;
+      }
+      let target = waiting[0];
+      if (waiting.length > 1) {
+        const pick = await vscode.window.showQuickPick(
+          waiting.map((s) => ({
+            label: `[${s.tag}]`,
+            description: s.last_message?.slice(0, 80) ?? "",
+            session: s,
+          })),
+          { placeHolder: "Pick a waiting AI CLI session" }
+        );
+        if (!pick) return;
+        target = pick.session;
+      }
+      await notificationMgr.sendQuickReply(target.session_id);
+    })
   );
 
   // Clean up stale state files on startup (older than 5 minutes)

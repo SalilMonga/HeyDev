@@ -19,6 +19,11 @@ export class NotificationManager {
   private activeNotifications = new Set<string>();
   // Track sessions that have already been notified — don't re-notify until state cycles back through "working"
   private _alreadyNotified = new Set<string>();
+  // Per-session resolver to programmatically dismiss the withProgress in-app notification.
+  // Calling the resolver dismisses the in-app popup naturally via VS Code's own UI.
+  private inAppDismissers = new Map<string, () => void>();
+  // Track currently-waiting sessions so the Quick Reply command can find them.
+  private waitingSessions = new Map<string, SessionState>();
   private disposables: vscode.Disposable[] = [];
 
   // Traced accessors for alreadyNotified — log every add/delete so we can see exactly when state changes.
@@ -170,35 +175,78 @@ export class NotificationManager {
     // Mark this notification as active and already notified
     this.activeNotifications.add(state.session_id);
     this.alreadyNotifiedAdd(state.session_id, "showNotification");
+    this.waitingSessions.set(state.session_id, state);
 
     // Schedule mac escalation in parallel with awaiting in-app interaction
     this.scheduleMacEscalation(state, snippet);
 
-    const action = await vscode.window.showInformationMessage(
-      message,
-      "Focus Terminal",
-      "Quick Reply"
+    // V2 — withProgress instead of showInformationMessage so we can dismiss programmatically.
+    // The promise we return controls the notification lifetime:
+    //   - User clicks Cancel → token.onCancellationRequested → resolve → dismiss
+    //   - Mac click handler calls our stored dismisser → resolve → dismiss
+    //   - state -> working → cancelMacEscalation also calls dismisser → resolve → dismiss
+    // VS Code uses its own Cancel button label, which we cannot rename. We treat Cancel
+    // as the "Focus Terminal" action — a slight UX wart, documented in CHANGELOG and #23.
+    let dismissReason: string = "external";
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: message,
+        cancellable: true,
+      },
+      (_progress, token) => {
+        return new Promise<void>((resolve) => {
+          this.inAppDismissers.set(state.session_id, () => {
+            dismissReason = "external";
+            this.inAppDismissers.delete(state.session_id);
+            resolve();
+          });
+          token.onCancellationRequested(() => {
+            dismissReason = "cancel";
+            this.inAppDismissers.delete(state.session_id);
+            resolve();
+          });
+        });
+      }
     );
 
-    // Any in-app interaction (or dismissal) cancels the mac escalation
-    this.cancelMacEscalation(state.session_id, "in-app interaction");
-
-    // If notification was dismissed (user switched to terminal manually), ignore the click
-    if (!this.activeNotifications.has(state.session_id)) return;
+    // After in-app dismisses for any reason — cancel mac escalation
+    this.cancelMacEscalation(state.session_id, `in-app dismissed (${dismissReason})`);
     this.activeNotifications.delete(state.session_id);
 
-    if (!terminal) return;
+    this.outputChannel.appendLine(
+      `[in-app] dismissed for session ${state.session_id} (${dismissReason})`
+    );
 
-    if (action === "Focus Terminal") {
+    // User-initiated cancel = treat as "Focus Terminal" action
+    if (dismissReason === "cancel" && terminal) {
       terminal.show();
-    } else if (action === "Quick Reply") {
-      const reply = await vscode.window.showInputBox({
-        prompt: `Reply to [${state.tag}]`,
-        placeHolder: "Type your response (e.g. yes, no, continue...)",
-      });
-      if (reply !== undefined && reply.trim() !== "") {
-        terminal.sendText(reply.trim());
-      }
+    }
+  }
+
+  /** Public — called by the heydev.quickReply command. Returns the active waiting sessions. */
+  getWaitingSessions(): SessionState[] {
+    return [...this.waitingSessions.values()];
+  }
+
+  /** Public — send a quick reply to a specific session's terminal. */
+  async sendQuickReply(sessionId: string): Promise<void> {
+    const state = this.waitingSessions.get(sessionId);
+    if (!state) {
+      vscode.window.showWarningMessage(`Session ${sessionId} is no longer waiting.`);
+      return;
+    }
+    const terminal = this.terminalManager.getTerminalForSession(sessionId);
+    if (!terminal) {
+      vscode.window.showWarningMessage(`No tracked terminal for session ${sessionId}.`);
+      return;
+    }
+    const reply = await vscode.window.showInputBox({
+      prompt: `Reply to [${state.tag}]`,
+      placeHolder: "Type your response (e.g. yes, no, continue...)",
+    });
+    if (reply !== undefined && reply.trim() !== "") {
+      terminal.sendText(reply.trim());
     }
   }
 
@@ -269,7 +317,7 @@ export class NotificationManager {
       "-message", message,
       "-appIcon", iconPath,
       "-group", groupId,
-      "-timeout", "30",
+      "-timeout", "60",
     ];
     if (playSound) args.push("-sound", "default");
 
@@ -322,11 +370,14 @@ export class NotificationManager {
             `[mac-notif] no terminal tracked for session ${state.session_id} — window focus only`
           );
         }
-        // Note: the in-app showInformationMessage popup will linger here. VS Code does
-        // not expose programmatic dismissal of a specific notification, and attempted
-        // workarounds (notifications.acceptPrimaryAction) did not reliably dismiss it.
-        // Tracked as a known limitation; future work: redesign the in-app UX to use a
-        // mechanism we fully control (e.g. status bar item or withProgress).
+        // Programmatically dismiss the in-app withProgress notification (V2).
+        const dismisser = this.inAppDismissers.get(state.session_id);
+        if (dismisser) {
+          this.outputChannel.appendLine(
+            `[mac-notif] dismissing in-app for session ${state.session_id}`
+          );
+          dismisser();
+        }
       }
       this.activeMacNotifGroups.delete(state.session_id);
     });
@@ -387,6 +438,15 @@ export class NotificationManager {
     }
     this.cancelMacEscalation(sessionId, reason);
     this.activeNotifications.delete(sessionId);
+    this.waitingSessions.delete(sessionId);
+    // Programmatically dismiss the in-app withProgress notification if visible
+    const dismisser = this.inAppDismissers.get(sessionId);
+    if (dismisser) {
+      this.outputChannel.appendLine(
+        `[in-app] dismissing for session ${sessionId} (cancelAll: ${reason})`
+      );
+      dismisser();
+    }
   }
 
   dispose(): void {
@@ -402,6 +462,12 @@ export class NotificationManager {
       this.dismissActiveMacNotif(groupId);
     }
     this.activeMacNotifGroups.clear();
+    // Dismiss any visible in-app notifications first so withProgress promises resolve
+    for (const dismisser of this.inAppDismissers.values()) {
+      dismisser();
+    }
+    this.inAppDismissers.clear();
+    this.waitingSessions.clear();
     this.activeNotifications.clear();
     this._alreadyNotified.clear();
     for (const d of this.disposables) {

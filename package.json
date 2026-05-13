@@ -47,6 +47,14 @@
       {
         "command": "heydev.removeHooks",
         "title": "HeyDev: Remove All Hooks (Claude, Codex)"
+      },
+      {
+        "command": "heydev.openSettings",
+        "title": "HeyDev: Open Settings"
+      },
+      {
+        "command": "heydev.quickReply",
+        "title": "HeyDev: Quick Reply to Waiting Session"
       }
     ],
     "configuration": {

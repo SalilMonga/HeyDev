@@ -2,6 +2,19 @@
 
 All notable changes to HeyDev will be documented in this file.
 
+## [Unreleased] - V2 in-app redesign
+
+### Changed
+- **In-app notification now uses `vscode.window.withProgress` instead of `showInformationMessage`** (#23). The new mechanism lets HeyDev dismiss the in-app popup programmatically when the mac notification is clicked or the session goes back to working — no more stale popups.
+- The in-app notification shows a single Cancel button (VS Code does not allow renaming it). Cancel acts as "Focus Terminal" — it brings the target terminal into focus.
+
+### Added
+- New command `HeyDev: Quick Reply to Waiting Session` (`heydev.quickReply`). Moved from the in-app notification's secondary action. If multiple sessions are waiting, a quick picker selects one. Available in command palette and bindable via keyboard shortcut.
+- New command `HeyDev: Open Settings` (`heydev.openSettings`). Opens VS Code settings filtered to HeyDev. Closes #21.
+
+### Known UX notes
+- The single Cancel button on the in-app notification is the only built-in label available — it semantically performs the Focus Terminal action despite saying "Cancel." Tracked as a follow-up to either restyle via a different mechanism (status bar item, webview) or accept as-is.
+
 ## [0.4.4] - 2026-05-12
 
 ### Fixed
@@ -12,7 +25,7 @@ All notable changes to HeyDev will be documented in this file.
 - Click detection handles `@CONTENTCLICKED` and `@ACTIONCLICKED` (terminal-notifier on macOS 15 emits the latter for body clicks).
 
 ### Known issues
-- The in-app `showInformationMessage` popup stays visible as a stale visual after the mac notification is clicked. VS Code does not expose programmatic per-notification dismissal. Future work: redesign the in-app UX.
+- The in-app `showInformationMessage` popup stays visible as a stale visual after the mac notification is clicked. VS Code does not expose programmatic per-notification dismissal. Future work: redesign the in-app UX. **(Fixed in unreleased V2 above.)**
 
 ## [0.4.3] - 2026-05-12
 
