@@ -2,7 +2,7 @@
   "name": "heydev",
   "displayName": "HeyDev",
   "description": "Real-time status indicators for AI CLI sessions (Claude Code, Codex, Copilot) in VS Code terminal tabs, with smart notifications and quick reply",
-  "version": "0.3.5",
+  "version": "0.5.0",
   "publisher": "salilmonga",
   "license": "MIT",
   "repository": {
@@ -31,8 +31,12 @@
     "vscode": "^1.85.0"
   },
   "icon": "images/icon.png",
-  "categories": ["Other"],
-  "activationEvents": ["onStartupFinished"],
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -43,6 +47,18 @@
       {
         "command": "heydev.removeHooks",
         "title": "HeyDev: Remove All Hooks (Claude, Codex)"
+      },
+      {
+        "command": "heydev.openSettings",
+        "title": "HeyDev: Open Settings"
+      },
+      {
+        "command": "heydev.focusSession",
+        "title": "HeyDev: Focus Waiting Session Terminal"
+      },
+      {
+        "command": "heydev.quickReply",
+        "title": "HeyDev: Quick Reply to Waiting Session"
       }
     ],
     "configuration": {
@@ -73,6 +89,23 @@
           "type": "string",
           "default": "",
           "description": "Override state file directory (default: ~/.heydev/state)"
+        },
+        "heydev.enableMacNotifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "Escalate to a native macOS notification if the in-app notification is not interacted with. macOS only."
+        },
+        "heydev.macNotificationDelaySeconds": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "maximum": 600,
+          "description": "Seconds to wait after the in-app notification before showing a macOS notification."
+        },
+        "heydev.macNotificationSound": {
+          "type": "boolean",
+          "default": false,
+          "description": "Play sound when the macOS notification fires."
         }
       }
     },
@@ -142,8 +175,12 @@
     "watch": "tsc -watch -p ./",
     "package": "vsce package"
   },
+  "dependencies": {
+    "node-notifier": "^10.0.1"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/node-notifier": "^8.0.5",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.0.0",
     "typescript": "^5.5.0"

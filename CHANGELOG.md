@@ -2,6 +2,68 @@
 
 All notable changes to HeyDev will be documented in this file.
 
+## [0.5.0] - 2026-05-12
+
+### Added
+- **macOS notification escalation** ships as a full feature. When the in-app notification is not interacted with, HeyDev fires a native macOS notification after a configurable delay. Clicking the macOS notification foregrounds VS Code and focuses the originating session terminal — useful for users running multiple VS Code windows.
+- **In-app notification now has inline Focus Terminal and Quick Reply links** that are real clickable commands. The pattern uses `withProgress` with `command:` URI markdown links, giving programmatic dismissal (the macOS notification click cleanly dismisses the in-app popup) while preserving multiple actions.
+- New command `HeyDev: Focus Waiting Session Terminal` (`heydev.focusSession`). Picks a waiting session and focuses its terminal.
+- New command `HeyDev: Quick Reply to Waiting Session` (`heydev.quickReply`). Opens an input box for the user to send a quick reply to a waiting session. Works from the command palette and from the in-app notification link.
+- New command `HeyDev: Open Settings` (`heydev.openSettings`) — closes #21.
+- New configuration: `heydev.enableMacNotifications`, `heydev.macNotificationDelaySeconds`, `heydev.macNotificationSound`.
+- Diagnostic logging in the HeyDev Output Channel covering the full notification lifecycle (state arrivals, in-app scheduled/firing/suppressed/dismissed, mac scheduled/fired/click).
+
+### Changed
+- macOS notification timeout extended to 180 seconds so the user has time to click before terminal-notifier auto-dismisses.
+- The in-app notification migrated from `showInformationMessage` to `withProgress` to gain programmatic dismissal.
+
+### Fixed
+- macOS notification reliability — fired via direct `child_process.spawn` with `detached: true` so terminal-notifier escapes the extension host's process group (the default node-notifier spawn was being suppressed on macOS by hardened-runtime entitlements).
+- Notifications could be incorrectly suppressed across waiting cycles — removed a redundant `alreadyNotified.add` in the active-terminal listener that was being re-triggered by macOS Space restoration.
+
+### Known issues
+- macOS notification icon shows Terminal.app icon instead of HeyDev's icon. The bundled terminal-notifier's `-appIcon` flag relies on a private macOS method that is silently ignored on recent macOS versions. Tracked as a follow-up — likely requires forking terminal-notifier with HeyDev's icon baked into the bundle.
+
+## [0.4.4] - 2026-05-12
+
+### Fixed
+- macOS notification not appearing despite the extension's fire path completing successfully. node-notifier's default spawn keeps terminal-notifier attached to the extension host's process group, and VS Code's hardened-runtime extension host appears to suppress notification UI from attached children. Switched to direct `child_process.spawn` with `detached: true` so terminal-notifier runs in its own process group.
+
+### Added
+- Mac notification click now both foregrounds VS Code and calls `terminal.show()` on the target session — equivalent to clicking the in-app "Focus Terminal" button.
+- Click detection handles `@CONTENTCLICKED` and `@ACTIONCLICKED` (terminal-notifier on macOS 15 emits the latter for body clicks).
+
+### Known issues
+- The in-app `showInformationMessage` popup stays visible as a stale visual after the mac notification is clicked. VS Code does not expose programmatic per-notification dismissal. Future work: redesign the in-app UX. **(Fixed in unreleased V2 above.)**
+
+## [0.4.3] - 2026-05-12
+
+### Added
+- Aggressive tracing of `alreadyNotified` set mutations for debugging notification flow.
+
+## [0.4.2] - 2026-05-12
+
+### Fixed
+- Notifications could be incorrectly suppressed across waiting cycles. The `onDidChangeActiveTerminal` listener used to add the session to `alreadyNotified`, but macOS Space restoration re-fires this event when returning to VS Code, blocking the next legitimate notification cycle. Removed the redundant flag set — the existing `activeTerminal` guard at fire time still handles the "user is currently looking at the terminal" case.
+
+### Added
+- Logging for terminal focus events in the HeyDev Output Channel.
+
+## [0.4.1] - 2026-05-12
+
+### Added
+- Diagnostic logging in the HeyDev Output Channel for the full notification lifecycle: state arrivals, in-app scheduled/firing/suppressed/skipped, mac scheduled/fired/cancelled/click. Makes debugging notification behavior easy.
+
+## [0.4.0] - 2026-05-12
+
+### Added
+- **macOS notification escalation** — if the in-app notification is not interacted with within a configurable delay, HeyDev now fires a native macOS notification. Clicking the notification focuses the originating VS Code window so you land on the correct workspace, even when running multiple VS Code instances.
+- New configuration settings:
+  - `heydev.enableMacNotifications` (default `true`) — toggle macOS escalation
+  - `heydev.macNotificationDelaySeconds` (default `30`) — seconds to wait after the in-app notification before escalating
+  - `heydev.macNotificationSound` (default `false`) — play sound when the macOS notification fires
+- `node-notifier` runtime dependency — bundles `terminal-notifier.app`, no system install required.
+
 ## [0.3.4] - 2026-04-20
 
 ### Added
