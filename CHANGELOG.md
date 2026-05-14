@@ -2,18 +2,27 @@
 
 All notable changes to HeyDev will be documented in this file.
 
-## [Unreleased] - V2 in-app redesign
-
-### Changed
-- **In-app notification now uses `vscode.window.withProgress` instead of `showInformationMessage`** (#23). The new mechanism lets HeyDev dismiss the in-app popup programmatically when the mac notification is clicked or the session goes back to working — no more stale popups.
-- The in-app notification shows a single Cancel button (VS Code does not allow renaming it). Cancel acts as "Focus Terminal" — it brings the target terminal into focus.
+## [0.5.0] - 2026-05-12
 
 ### Added
-- New command `HeyDev: Quick Reply to Waiting Session` (`heydev.quickReply`). Moved from the in-app notification's secondary action. If multiple sessions are waiting, a quick picker selects one. Available in command palette and bindable via keyboard shortcut.
-- New command `HeyDev: Open Settings` (`heydev.openSettings`). Opens VS Code settings filtered to HeyDev. Closes #21.
+- **macOS notification escalation** ships as a full feature. When the in-app notification is not interacted with, HeyDev fires a native macOS notification after a configurable delay. Clicking the macOS notification foregrounds VS Code and focuses the originating session terminal — useful for users running multiple VS Code windows.
+- **In-app notification now has inline Focus Terminal and Quick Reply links** that are real clickable commands. The pattern uses `withProgress` with `command:` URI markdown links, giving programmatic dismissal (the macOS notification click cleanly dismisses the in-app popup) while preserving multiple actions.
+- New command `HeyDev: Focus Waiting Session Terminal` (`heydev.focusSession`). Picks a waiting session and focuses its terminal.
+- New command `HeyDev: Quick Reply to Waiting Session` (`heydev.quickReply`). Opens an input box for the user to send a quick reply to a waiting session. Works from the command palette and from the in-app notification link.
+- New command `HeyDev: Open Settings` (`heydev.openSettings`) — closes #21.
+- New configuration: `heydev.enableMacNotifications`, `heydev.macNotificationDelaySeconds`, `heydev.macNotificationSound`.
+- Diagnostic logging in the HeyDev Output Channel covering the full notification lifecycle (state arrivals, in-app scheduled/firing/suppressed/dismissed, mac scheduled/fired/click).
 
-### Known UX notes
-- The single Cancel button on the in-app notification is the only built-in label available — it semantically performs the Focus Terminal action despite saying "Cancel." Tracked as a follow-up to either restyle via a different mechanism (status bar item, webview) or accept as-is.
+### Changed
+- macOS notification timeout extended to 180 seconds so the user has time to click before terminal-notifier auto-dismisses.
+- The in-app notification migrated from `showInformationMessage` to `withProgress` to gain programmatic dismissal.
+
+### Fixed
+- macOS notification reliability — fired via direct `child_process.spawn` with `detached: true` so terminal-notifier escapes the extension host's process group (the default node-notifier spawn was being suppressed on macOS by hardened-runtime entitlements).
+- Notifications could be incorrectly suppressed across waiting cycles — removed a redundant `alreadyNotified.add` in the active-terminal listener that was being re-triggered by macOS Space restoration.
+
+### Known issues
+- macOS notification icon shows Terminal.app icon instead of HeyDev's icon. The bundled terminal-notifier's `-appIcon` flag relies on a private macOS method that is silently ignored on recent macOS versions. Tracked as a follow-up — likely requires forking terminal-notifier with HeyDev's icon baked into the bundle.
 
 ## [0.4.4] - 2026-05-12
 

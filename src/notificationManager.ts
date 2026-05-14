@@ -180,29 +180,35 @@ export class NotificationManager {
     // Schedule mac escalation in parallel with awaiting in-app interaction
     this.scheduleMacEscalation(state, snippet);
 
-    // V2 — withProgress instead of showInformationMessage so we can dismiss programmatically.
-    // The promise we return controls the notification lifetime:
-    //   - User clicks Cancel → token.onCancellationRequested → resolve → dismiss
-    //   - Mac click handler calls our stored dismisser → resolve → dismiss
-    //   - state -> working → cancelMacEscalation also calls dismisser → resolve → dismiss
-    // VS Code uses its own Cancel button label, which we cannot rename. We treat Cancel
-    // as the "Focus Terminal" action — a slight UX wart, documented in CHANGELOG and #23.
-    let dismissReason: string = "external";
+    // V3 — withProgress with inline command-URI links in the progress message,
+    // emulating real action buttons that programmatically dismiss the notification.
+    // Each "button" is a markdown link that triggers a registered command. The
+    // commands cancel a CancellationTokenSource which resolves the withProgress
+    // promise, naturally dismissing the in-app popup.
+    // Pattern from: https://www.eliostruyf.com/creating-timer-dismissable-notifications-visual-studio-code-extension/
+    const args = encodeURIComponent(JSON.stringify([state.session_id]));
+    const focusLink = `[Focus Terminal](command:heydev.focusSession?${args})`;
+    const replyLink = `[Quick Reply](command:heydev.quickReply?${args})`;
+    const messageText = snippet ? snippet.replace(/^: /, "") : "Needs your attention";
+    // Try multiple line-break syntaxes; VS Code's progress message parser is finicky.
+    // Markdown standard: two trailing spaces + \n. Also try \n\n (paragraph) and <br>.
+    const progressMessage = `${messageText}  \n\n${focusLink} · ${replyLink}`;
+
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: message,
+        title: `[${state.tag}] waiting`,
         cancellable: true,
       },
-      (_progress, token) => {
+      (progress, token) => {
         return new Promise<void>((resolve) => {
+          progress.report({ message: progressMessage });
           this.inAppDismissers.set(state.session_id, () => {
-            dismissReason = "external";
             this.inAppDismissers.delete(state.session_id);
             resolve();
           });
+          // Cancel button (X) on the progress notification dismisses without action
           token.onCancellationRequested(() => {
-            dismissReason = "cancel";
             this.inAppDismissers.delete(state.session_id);
             resolve();
           });
@@ -210,18 +216,13 @@ export class NotificationManager {
       }
     );
 
-    // After in-app dismisses for any reason — cancel mac escalation
-    this.cancelMacEscalation(state.session_id, `in-app dismissed (${dismissReason})`);
+    this.cancelMacEscalation(state.session_id, "in-app dismissed");
     this.activeNotifications.delete(state.session_id);
+    this.waitingSessions.delete(state.session_id);
 
     this.outputChannel.appendLine(
-      `[in-app] dismissed for session ${state.session_id} (${dismissReason})`
+      `[in-app] dismissed for session ${state.session_id}`
     );
-
-    // User-initiated cancel = treat as "Focus Terminal" action
-    if (dismissReason === "cancel" && terminal) {
-      terminal.show();
-    }
   }
 
   /** Public — called by the heydev.quickReply command. Returns the active waiting sessions. */
@@ -229,7 +230,16 @@ export class NotificationManager {
     return [...this.waitingSessions.values()];
   }
 
-  /** Public — send a quick reply to a specific session's terminal. */
+  /** Public — focus the specified session's terminal and dismiss its in-app popup. */
+  focusSession(sessionId: string): void {
+    const terminal = this.terminalManager.getTerminalForSession(sessionId);
+    if (terminal) {
+      terminal.show();
+    }
+    this.dismissInApp(sessionId, "focusSession command");
+  }
+
+  /** Public — send a quick reply to a specific session's terminal, then dismiss its in-app popup. */
   async sendQuickReply(sessionId: string): Promise<void> {
     const state = this.waitingSessions.get(sessionId);
     if (!state) {
@@ -247,6 +257,18 @@ export class NotificationManager {
     });
     if (reply !== undefined && reply.trim() !== "") {
       terminal.sendText(reply.trim());
+    }
+    this.dismissInApp(sessionId, "quickReply command");
+  }
+
+  /** Public — programmatically dismiss the in-app withProgress popup for a session. */
+  dismissInApp(sessionId: string, reason: string): void {
+    const dismisser = this.inAppDismissers.get(sessionId);
+    if (dismisser) {
+      this.outputChannel.appendLine(
+        `[in-app] dismissing for session ${sessionId} (${reason})`
+      );
+      dismisser();
     }
   }
 
@@ -317,7 +339,7 @@ export class NotificationManager {
       "-message", message,
       "-appIcon", iconPath,
       "-group", groupId,
-      "-timeout", "60",
+      "-timeout", "180",
     ];
     if (playSound) args.push("-sound", "default");
 

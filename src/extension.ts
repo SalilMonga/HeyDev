@@ -42,7 +42,34 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("heydev.openSettings", () =>
       vscode.commands.executeCommand("workbench.action.openSettings", "heydev")
     ),
-    vscode.commands.registerCommand("heydev.quickReply", async () => {
+    vscode.commands.registerCommand("heydev.focusSession", (sessionId?: string) => {
+      if (sessionId) {
+        notificationMgr.focusSession(sessionId);
+        return;
+      }
+      // No sessionId arg → resolve via waiting list (palette path)
+      const waiting = notificationMgr.getWaitingSessions();
+      if (waiting.length === 0) {
+        vscode.window.showInformationMessage("No AI CLI sessions are currently waiting.");
+        return;
+      }
+      if (waiting.length === 1) {
+        notificationMgr.focusSession(waiting[0].session_id);
+      } else {
+        vscode.window.showQuickPick(
+          waiting.map((s) => ({ label: `[${s.tag}]`, description: s.last_message?.slice(0, 80) ?? "", session: s })),
+          { placeHolder: "Pick a waiting AI CLI session to focus" }
+        ).then((pick) => {
+          if (pick) notificationMgr.focusSession(pick.session.session_id);
+        });
+      }
+    }),
+    vscode.commands.registerCommand("heydev.quickReply", async (sessionId?: string) => {
+      if (sessionId) {
+        await notificationMgr.sendQuickReply(sessionId);
+        return;
+      }
+      // No sessionId arg → resolve via waiting list (palette path)
       const waiting = notificationMgr.getWaitingSessions();
       if (waiting.length === 0) {
         vscode.window.showInformationMessage("No AI CLI sessions are currently waiting.");
